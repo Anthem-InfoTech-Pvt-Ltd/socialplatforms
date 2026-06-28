@@ -58,7 +58,7 @@ export function Header() {
               <div className="hidden sm:block text-right">
                 <p className="text-sm font-medium text-foreground">{user.name}</p>
                 <p className="text-xs text-muted-foreground capitalize">
-                  {user.role.replace('_', ' ')}
+                  {user?.role?.replace('_', ' ') ?? 'user'}
                 </p>
               </div>
               <img

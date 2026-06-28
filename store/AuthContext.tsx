@@ -11,11 +11,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   // Initialize auth on mount
-  useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    setUser(currentUser);
-    setIsLoading(false);
-  }, []);
+useEffect(() => {
+  const initAuth = async () => {
+    const currentUser = await authService.getCurrentUser()
+    setUser(currentUser)
+    setIsLoading(false)
+  }
+  initAuth()
+
+  // Supabase auth state listener
+  const { data: { subscription } } = authService.onAuthStateChange((user) => {
+    setUser(user)
+    setIsLoading(false)
+  })
+
+  return () => subscription.unsubscribe()
+}, [])
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);

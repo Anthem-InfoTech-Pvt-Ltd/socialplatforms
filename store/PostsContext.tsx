@@ -9,20 +9,11 @@ interface PostsContextType {
   isLoading: boolean;
   error: string | null;
   loadPosts: (userId: string) => Promise<void>;
-  createPost: (
-    userId: string,
-    content: string,
-    platforms: string[],
-    mediaUrls?: string[]
-  ) => Promise<Post>;
+  createPost: (userId: string, content: string, platforms: string[], mediaUrls?: string[]) => Promise<Post>;
   updatePost: (postId: string, updates: Partial<Post>) => Promise<Post>;
   deletePost: (postId: string) => Promise<void>;
   publishPost: (postId: string, accountIds: string[]) => Promise<boolean>;
-  schedulePost: (
-    postId: string,
-    scheduledAt: Date,
-    accountIds: string[]
-  ) => Promise<Post>;
+  schedulePost: (postId: string, scheduledAt: Date, accountIds: string[]) => Promise<Post>;
 }
 
 const PostsContext = createContext<PostsContextType | undefined>(undefined);
@@ -45,35 +36,20 @@ export function PostsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const createPost = useCallback(
-    async (
-      userId: string,
-      content: string,
-      platforms: string[],
-      mediaUrls: string[] = []
-    ) => {
-      try {
-        const newPost = await postService.createPost(
-          userId,
-          content,
-          platforms,
-          mediaUrls
-        );
-        setPosts((prev) => [newPost, ...prev]);
-        return newPost;
-      } catch (err) {
-        throw err instanceof Error ? err : new Error('Failed to create post');
-      }
-    },
-    []
-  );
+  const createPost = useCallback(async (userId: string, content: string, platforms: string[], mediaUrls: string[] = []) => {
+    try {
+      const newPost = await postService.createPost(userId, content, platforms, mediaUrls);
+      setPosts((prev) => [newPost, ...prev]);
+      return newPost;
+    } catch (err) {
+      throw err instanceof Error ? err : new Error('Failed to create post');
+    }
+  }, []);
 
   const updatePost = useCallback(async (postId: string, updates: Partial<Post>) => {
     try {
       const updatedPost = await postService.updatePost(postId, updates);
-      setPosts((prev) =>
-        prev.map((p) => (p.id === postId ? updatedPost : p))
-      );
+      setPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
       return updatedPost;
     } catch (err) {
       throw err instanceof Error ? err : new Error('Failed to update post');
@@ -92,13 +68,9 @@ export function PostsProvider({ children }: { children: ReactNode }) {
   const publishPost = useCallback(async (postId: string, accountIds: string[]) => {
     try {
       const result = await postService.publishPost(postId, accountIds);
-      if (result.success) {
-        const updatedPost = await postService.getPostById(postId);
-        if (updatedPost) {
-          setPosts((prev) =>
-            prev.map((p) => (p.id === postId ? updatedPost : p))
-          );
-        }
+      const updatedPost = await postService.getPostById(postId);
+      if (updatedPost) {
+        setPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
       }
       return result.success;
     } catch (err) {
@@ -106,24 +78,15 @@ export function PostsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const schedulePost = useCallback(
-    async (postId: string, scheduledAt: Date, accountIds: string[]) => {
-      try {
-        const scheduledPost = await postService.schedulePost(
-          postId,
-          scheduledAt,
-          accountIds
-        );
-        setPosts((prev) =>
-          prev.map((p) => (p.id === postId ? scheduledPost : p))
-        );
-        return scheduledPost;
-      } catch (err) {
-        throw err instanceof Error ? err : new Error('Failed to schedule post');
-      }
-    },
-    []
-  );
+  const schedulePost = useCallback(async (postId: string, scheduledAt: Date, accountIds: string[]) => {
+    try {
+      const scheduledPost = await postService.schedulePost(postId, scheduledAt);
+      setPosts((prev) => prev.map((p) => (p.id === postId ? scheduledPost : p)));
+      return scheduledPost;
+    } catch (err) {
+      throw err instanceof Error ? err : new Error('Failed to schedule post');
+    }
+  }, []);
 
   const value: PostsContextType = {
     posts,

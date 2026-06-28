@@ -1,107 +1,67 @@
-import { User } from '@/types';
+import { createClient } from '@/lib/supabase/client'
 
-// Mock in-memory user storage
-const mockUsers: { [email: string]: { password: string; user: User } } = {
-  'demo@example.com': {
-    password: 'demo123',
-    user: {
-      id: '1',
-      email: 'demo@example.com',
-      name: 'Demo User',
-      role: 'marketing_user',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=demo',
-      createdAt: new Date(),
-    },
-  },
-  'admin@example.com': {
-    password: 'admin123',
-    user: {
-      id: '2',
-      email: 'admin@example.com',
-      name: 'Admin User',
-      role: 'admin',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
-      createdAt: new Date(),
-    },
-  },
-};
-
-// TODO: Replace mock authentication with real backend API
-// Integration points:
-// - Connect to actual authentication provider (Firebase, Auth0, Supabase, etc.)
-// - Store sessions in database
-// - Implement JWT token management
-// - Add password hashing and validation
+const supabase = createClient()
 
 export const authService = {
-  async login(email: string, password: string): Promise<User> {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  async login(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw new Error(error.message)
 
-    const user = mockUsers[email];
-    if (!user || user.password !== password) {
-      throw new Error('Invalid email or password');
-    }
+    const { data: profile } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', data.user.id)
+      .single()
 
-    // Store token in localStorage (mock)
-    localStorage.setItem('authToken', JSON.stringify(user.user));
-    return user.user;
+    return profile
   },
 
-  async register(email: string, name: string, password: string): Promise<User> {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    if (mockUsers[email]) {
-      throw new Error('Email already exists');
-    }
-
-    const newUser: User = {
-      id: Date.now().toString(),
+  async register(email: string, name: string, password: string) {
+    const { data, error } = await supabase.auth.signUp({
       email,
-      name,
-      role: 'marketing_user',
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-      createdAt: new Date(),
-    };
-
-    mockUsers[email] = {
       password,
-      user: newUser,
-    };
-
-    localStorage.setItem('authToken', JSON.stringify(newUser));
-    return newUser;
+      options: { data: { name } }
+    })
+    if (error) throw new Error(error.message)
+    return data.user
   },
 
-  async resetPassword(email: string): Promise<void> {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  async getCurrentUser() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
 
-    if (!mockUsers[email]) {
-      throw new Error('Email not found');
-    }
+    const { data: profile } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single()
 
-    // TODO: Send password reset email
-    // - Generate reset token
-    // - Send email with reset link
-    // - Handle token verification and password update
-
-    console.log(`Password reset email would be sent to ${email}`);
+    return profile ?? null
   },
 
-  logout(): void {
-    localStorage.removeItem('authToken');
+  onAuthStateChange(callback: (user: any) => void) {
+    return supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+        callback(profile ?? null)
+      } else {
+        callback(null)
+      }
+    })
   },
 
-  getCurrentUser(): User | null {
-    const token = localStorage.getItem('authToken');
-    if (!token) return null;
-
-    try {
-      return JSON.parse(token);
-    } catch {
-      return null;
-    }
+  async logout() {
+    await supabase.auth.signOut()
   },
-};
+
+  async resetPassword(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`
+    })
+    if (error) throw new Error(error.message)
+  }
+}

@@ -34,26 +34,17 @@ export default function AccountsPage() {
     }
   }, [user, loadAccounts]);
 
-  const handleConnect = async (platform: 'facebook' | 'instagram' | 'linkedin') => {
-    if (!user) return;
-
-    setConnecting(platform);
-    setError('');
-    setSuccess('');
-
-    try {
-      await connectAccount(user.id, platform, {
-        accountName: `${platform.charAt(0).toUpperCase() + platform.slice(1)} Account`,
-        accountId: `${platform}_${Date.now()}`,
-      });
-      setSuccess(`Successfully connected ${platform}!`);
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to connect ${platform}`);
-    } finally {
-      setConnecting(null);
+  const handleConnect = (platform: 'facebook' | 'instagram' | 'linkedin') => {
+    if (platform === 'facebook') {
+      // Mock insert nahi — real OAuth redirect
+      window.location.href = '/api/auth/facebook'
+      return
     }
-  };
+    if (platform === 'linkedin') {
+      window.location.href = '/api/auth/linkedin'
+      return
+    }
+  }
 
   const handleDisconnect = async (accountId: string) => {
     if (!confirm('Are you sure you want to disconnect this account?')) return;
