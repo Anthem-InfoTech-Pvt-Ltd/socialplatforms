@@ -1,3 +1,4 @@
+// app/api/auth/linkedin/callback/route.ts
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {

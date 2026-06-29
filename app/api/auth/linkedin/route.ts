@@ -1,3 +1,4 @@
+// app/api/auth/linkedin/route.ts
 export async function GET() {
   const params = new URLSearchParams({
     response_type: 'code',

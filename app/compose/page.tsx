@@ -7,18 +7,30 @@ import { useAccounts } from '@/store/AccountsContext';
 import { usePosts } from '@/store/PostsContext';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
+import { RichTextEditor } from '@/components/features/RichTextEditor';
+
+const platformLimits: Record<string, number> = {
+  facebook: 63206,
+  instagram: 2200,
+  linkedin: 3000,
+}
 
 export default function ComposePage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { accounts, loadAccounts, isLoading: accountsLoading } = useAccounts();
   const { createPost, publishPost, isLoading: postsLoading } = usePosts();
-  const [content, setContent] = useState('');
+  const [contentHtml, setContentHtml] = useState('');
+  const [contentText, setContentText] = useState('');
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['facebook']);
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const activeLimit = selectedPlatforms.length > 0
+    ? Math.min(...selectedPlatforms.map(p => platformLimits[p] ?? 3000))
+    : 3000;
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -49,15 +61,14 @@ export default function ComposePage() {
   };
 
   const handleSaveDraft = async () => {
-    if (!user || !content.trim()) {
+    if (!user || !contentText.trim()) {
       setError('Please write something');
       return;
     }
-
     try {
       setError('');
       setSuccess('');
-      await createPost(user.id, content, selectedPlatforms);
+      await createPost(user.id, contentText, selectedPlatforms);
       setSuccess('Draft saved successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -66,24 +77,23 @@ export default function ComposePage() {
   };
 
   const handlePublish = async () => {
-    if (!user || !content.trim()) {
+    if (!user || !contentText.trim()) {
       setError('Please write something');
       return;
     }
-
     if (selectedAccounts.length === 0) {
       setError('Please select at least one account');
       return;
     }
-
     try {
       setError('');
       setSuccess('');
       setIsPublishing(true);
-      const post = await createPost(user.id, content, selectedPlatforms);
+      const post = await createPost(user.id, contentText, selectedPlatforms);
       await publishPost(post.id, selectedAccounts);
       setSuccess('Post published successfully!');
-      setContent('');
+      setContentHtml('');
+      setContentText('');
       setSelectedAccounts([]);
       setTimeout(() => router.push('/history'), 2000);
     } catch (err) {
@@ -101,9 +111,7 @@ export default function ComposePage() {
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
-  }
+  if (!isAuthenticated) return null;
 
   const accountsByPlatform: { [key: string]: typeof accounts } = {};
   selectedPlatforms.forEach((platform) => {
@@ -124,21 +132,27 @@ export default function ComposePage() {
           {/* Main Composer */}
           <div className="lg:col-span-2">
             <div className="bg-card border border-border rounded-lg p-6 space-y-4">
-              {/* Content Area */}
+
+              {/* Rich Text Editor */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
                   Post Content
                 </label>
-                <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
+                <RichTextEditor
+                  content={contentHtml}
+                  onChange={(html, text) => {
+                    setContentHtml(html);
+                    setContentText(text);
+                  }}
                   placeholder="What's on your mind? Share with your followers..."
-                  className="w-full px-4 py-3 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                  rows={6}
+                  maxLength={activeLimit}
                 />
-                <p className="text-xs text-muted-foreground mt-2">
-                  {content.length} characters
-                </p>
+                {selectedPlatforms.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Limit: {activeLimit.toLocaleString()} chars
+                    {selectedPlatforms.length > 1 && ` (lowest of selected platforms)`}
+                  </p>
+                )}
               </div>
 
               {/* Alerts */}
@@ -147,7 +161,6 @@ export default function ComposePage() {
                   <p className="text-sm text-destructive">{error}</p>
                 </div>
               )}
-
               {success && (
                 <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
                   <p className="text-sm text-green-500">{success}</p>
@@ -160,7 +173,7 @@ export default function ComposePage() {
                   Platforms
                 </label>
                 <div className="grid grid-cols-3 gap-3">
-                  {['facebook', 'instagram', 'linkedin'].map((platform) => (
+                  {(['facebook', 'instagram', 'linkedin'] as const).map((platform) => (
                     <button
                       key={platform}
                       onClick={() => handleTogglePlatform(platform)}
@@ -171,6 +184,9 @@ export default function ComposePage() {
                       }`}
                     >
                       <div className="text-sm font-medium capitalize">{platform}</div>
+                      <div className="text-xs mt-1 opacity-60">
+                        {platformLimits[platform].toLocaleString()} chars
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -212,17 +228,14 @@ export default function ComposePage() {
                     )}
                   </div>
 
-                  {selectedPlatforms.length > 0 &&
-                    Object.values(accountsByPlatform).every((acc) => acc.length === 0) && (
-                      <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                        <p className="text-sm text-amber-500">
-                          No accounts connected for selected platforms.{' '}
-                          <a href="/accounts" className="underline">
-                            Connect accounts
-                          </a>
-                        </p>
-                      </div>
-                    )}
+                  {Object.values(accountsByPlatform).every((acc) => acc.length === 0) && (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                      <p className="text-sm text-amber-500">
+                        No accounts connected for selected platforms.{' '}
+                        <a href="/accounts" className="underline">Connect accounts</a>
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -252,23 +265,29 @@ export default function ComposePage() {
             {/* Preview */}
             <div className="bg-card border border-border rounded-lg p-4">
               <h3 className="font-semibold text-foreground mb-3">Preview</h3>
-              <div className="bg-background border border-border rounded-lg p-3 min-h-24">
-                <p className="text-sm text-foreground break-words">{content || '...'}</p>
-              </div>
+              <div
+                className="bg-background border border-border rounded-lg p-3 min-h-24 text-sm text-foreground prose prose-sm max-w-none
+                  [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-4
+                  [&_ol]:list-decimal [&_ol]:pl-4 [&_blockquote]:border-l-4
+                  [&_blockquote]:border-primary [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground
+                  [&_img]:max-w-full [&_img]:rounded [&_h2]:font-bold [&_h2]:text-base"
+                dangerouslySetInnerHTML={{ __html: contentHtml || '<p class="text-muted-foreground">...</p>' }}
+              />
             </div>
 
-            {/* Info */}
+            {/* Tips */}
             <div className="bg-card border border-border rounded-lg p-4">
               <h3 className="font-semibold text-foreground mb-3">Tips</h3>
               <ul className="space-y-2 text-xs text-muted-foreground">
                 <li>✓ Keep posts concise and engaging</li>
                 <li>✓ Use relevant hashtags</li>
-                <li>✓ Schedule posts for optimal engagement</li>
-                <li>✓ Engage with comments quickly</li>
+                <li>✓ Bold key points for emphasis</li>
+                <li>✓ Images boost engagement 3x</li>
+                <li>✓ Schedule for optimal timing</li>
               </ul>
             </div>
 
-            {/* Accounts Status */}
+            {/* Connected Accounts */}
             <div className="bg-card border border-border rounded-lg p-4">
               <h3 className="font-semibold text-foreground mb-3">Connected Accounts</h3>
               {accounts.length > 0 ? (
@@ -276,8 +295,8 @@ export default function ComposePage() {
                   {accounts.map((account) => (
                     <div key={account.id} className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full" />
-                      <span className="text-xs text-muted-foreground">
-                        {account.accountName}
+                      <span className="text-xs text-muted-foreground capitalize">
+                        {account.platform} — {account.accountName}
                       </span>
                     </div>
                   ))}
