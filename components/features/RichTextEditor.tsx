@@ -134,7 +134,6 @@ export function RichTextEditor({ content, onChange, placeholder = "What's on you
           Clear
         </button>
       </div>
-
       {/* Editor Content */}
       <EditorContent
         editor={editor}
