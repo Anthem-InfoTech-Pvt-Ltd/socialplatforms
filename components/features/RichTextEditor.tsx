@@ -2,10 +2,8 @@
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
 import CharacterCount from '@tiptap/extension-character-count'
-import { useRef } from 'react'
 
 interface RichTextEditorProps {
   content: string
@@ -15,16 +13,26 @@ interface RichTextEditorProps {
 }
 
 export function RichTextEditor({ content, onChange, placeholder = "What's on your mind?", maxLength = 3000 }: RichTextEditorProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
   const editor = useEditor({
     extensions: [
-      StarterKit,
-      Image.configure({ inline: false, allowBase64: true }),
+      StarterKit.configure({
+        bold: false,
+        italic: false,
+        strike: false,
+        heading: false,
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+        blockquote: false,
+        code: false,
+        codeBlock: false,
+        horizontalRule: false,
+      }),
       Placeholder.configure({ placeholder }),
       CharacterCount.configure({ limit: maxLength }),
     ],
     content,
+    immediatelyRender: false,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML(), editor.getText())
     },
@@ -32,145 +40,68 @@ export function RichTextEditor({ content, onChange, placeholder = "What's on you
 
   if (!editor) return null
 
-  const addImage = () => fileInputRef.current?.click()
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const src = event.target?.result as string
-      editor.chain().focus().setImage({ src }).run()
-    }
-    reader.readAsDataURL(file)
-  }
-
   const charCount = editor.storage.characterCount.characters()
   const percentage = Math.round((charCount / maxLength) * 100)
+  const isNearLimit = percentage > 80
+  const isAtLimit = percentage >= 100
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden bg-background">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-1 p-2 border-b border-border bg-card">
-        {/* Text Style */}
-        <button
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`p-2 rounded text-sm font-bold transition-colors ${editor.isActive('bold') ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'}`}
-          title="Bold"
-        >
-          B
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`p-2 rounded text-sm italic transition-colors ${editor.isActive('italic') ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'}`}
-          title="Italic"
-        >
-          I
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          className={`p-2 rounded text-sm line-through transition-colors ${editor.isActive('strike') ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'}`}
-          title="Strikethrough"
-        >
-          S
-        </button>
-
-        <div className="w-px h-6 bg-border mx-1" />
-
-        {/* Lists */}
-        <button
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={`p-2 rounded text-sm transition-colors ${editor.isActive('bulletList') ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'}`}
-          title="Bullet List"
-        >
-          • List
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={`p-2 rounded text-sm transition-colors ${editor.isActive('orderedList') ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'}`}
-          title="Numbered List"
-        >
-          1. List
-        </button>
-
-        <div className="w-px h-6 bg-border mx-1" />
-
-        {/* Headings */}
-        <button
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={`p-2 rounded text-sm font-semibold transition-colors ${editor.isActive('heading', { level: 2 }) ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'}`}
-          title="Heading"
-        >
-          H2
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          className={`p-2 rounded text-sm transition-colors ${editor.isActive('blockquote') ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'}`}
-          title="Quote"
-        >
-          ❝
-        </button>
-
-        <div className="w-px h-6 bg-border mx-1" />
-
-        {/* Media */}
-        <button
-          onClick={addImage}
-          className="p-2 rounded text-sm transition-colors text-foreground hover:bg-muted"
-          title="Add Image"
-        >
-          🖼 Image
-        </button>
-
-        <div className="w-px h-6 bg-border mx-1" />
-
-        {/* Clear */}
-        <button
-          onClick={() => editor.chain().focus().clearContent().run()}
-          className="p-2 rounded text-sm transition-colors text-destructive hover:bg-destructive/10"
-          title="Clear"
-        >
-          Clear
-        </button>
-      </div>
-      {/* Editor Content */}
+    <div className={`border rounded-xl overflow-hidden bg-background transition-all ${
+      isAtLimit
+        ? 'border-destructive ring-1 ring-destructive/20'
+        : 'border-border focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10'
+    }`}>
       <EditorContent
         editor={editor}
-        className="min-h-[160px] max-h-[400px] overflow-y-auto p-4 prose prose-sm max-w-none
+        className="
           [&_.ProseMirror]:outline-none
+          [&_.ProseMirror]:p-4
+          [&_.ProseMirror]:min-h-[200px]
+          [&_.ProseMirror]:max-h-[360px]
+          [&_.ProseMirror]:overflow-y-auto
+          [&_.ProseMirror]:text-sm
+          [&_.ProseMirror]:leading-relaxed
+          [&_.ProseMirror]:text-foreground
+          [&_.ProseMirror_p]:mb-2
+          [&_.ProseMirror_p:last-child]:mb-0
           [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]
-          [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground
+          [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground/50
           [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none
           [&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left
           [&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0
-          [&_.ProseMirror_img]:max-w-full [&_.ProseMirror_img]:rounded-lg [&_.ProseMirror_img]:my-2
-          [&_.ProseMirror_blockquote]:border-l-4 [&_.ProseMirror_blockquote]:border-primary
-          [&_.ProseMirror_blockquote]:pl-4 [&_.ProseMirror_blockquote]:text-muted-foreground
-          [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-4
-          [&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ol]:pl-4
-          [&_.ProseMirror_h2]:text-xl [&_.ProseMirror_h2]:font-bold [&_.ProseMirror_h2]:mb-2
-          [&_.ProseMirror_strong]:font-bold [&_.ProseMirror_em]:italic"
+        "
       />
 
-      {/* Character Count */}
-      <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-card">
-        <span className="text-xs text-muted-foreground">
-          Supports bold, italic, lists, images
-        </span>
-        <span className={`text-xs font-medium ${percentage > 90 ? 'text-destructive' : 'text-muted-foreground'}`}>
-          {charCount} / {maxLength}
-        </span>
+      {/* Footer */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-t border-border/50 bg-muted/10">
+        <button
+          type="button"
+          onClick={() => editor.commands.clearContent()}
+          className="text-xs text-muted-foreground/60 hover:text-destructive transition-colors"
+        >
+          Clear
+        </button>
+        <div className="flex items-center gap-2.5">
+          {isNearLimit && (
+            <span className={`text-xs ${isAtLimit ? 'text-destructive font-medium' : 'text-amber-500'}`}>
+              {isAtLimit ? 'Limit reached' : `${maxLength - charCount} left`}
+            </span>
+          )}
+          <div className="w-20 h-1 bg-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                isAtLimit ? 'bg-destructive' : isNearLimit ? 'bg-amber-500' : 'bg-primary/40'
+              }`}
+              style={{ width: `${Math.min(percentage, 100)}%` }}
+            />
+          </div>
+          <span className={`text-xs tabular-nums ${
+            isAtLimit ? 'text-destructive font-medium' : 'text-muted-foreground/50'
+          }`}>
+            {charCount.toLocaleString()} / {maxLength.toLocaleString()}
+          </span>
+        </div>
       </div>
-
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleImageUpload}
-        className="hidden"
-      />
     </div>
   )
 }

@@ -62,9 +62,12 @@ export function Header() {
                 </p>
               </div>
               <img
-                src={user.avatar}
+                src={user.avatar?.trim() || "/image/user.png"}
                 alt={user.name}
-                className="w-8 h-8 rounded-full bg-muted"
+                className="w-8 h-8 rounded-full bg-muted object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = "/image/user.png";
+                }}
               />
               <Button
                 variant="ghost"

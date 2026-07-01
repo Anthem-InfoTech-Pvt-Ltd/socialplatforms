@@ -10,9 +10,9 @@ import { Button } from '@/components/ui/button';
 import { RichTextEditor } from '@/components/features/RichTextEditor';
 
 const platformLimits: Record<string, number> = {
-  facebook: 63206,
-  instagram: 2200,
-  linkedin: 3000,
+  facebook: 1000,
+  instagram: 1000,
+  linkedin: 1000,
 }
 
 export default function ComposePage() {
@@ -22,7 +22,7 @@ export default function ComposePage() {
   const { createPost, publishPost, isLoading: postsLoading } = usePosts();
   const [contentHtml, setContentHtml] = useState('');
   const [contentText, setContentText] = useState('');
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['facebook']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['linkedin']);
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState('');
@@ -173,22 +173,25 @@ export default function ComposePage() {
                   Platforms
                 </label>
                 <div className="grid grid-cols-3 gap-3">
-                  {(['facebook', 'instagram', 'linkedin'] as const).map((platform) => (
-                    <button
-                      key={platform}
-                      onClick={() => handleTogglePlatform(platform)}
-                      className={`p-3 border rounded-lg transition-all ${
-                        selectedPlatforms.includes(platform)
-                          ? 'bg-primary/10 border-primary text-primary'
-                          : 'bg-background border-border text-muted-foreground hover:border-border/80'
-                      }`}
-                    >
-                      <div className="text-sm font-medium capitalize">{platform}</div>
-                      <div className="text-xs mt-1 opacity-60">
-                        {platformLimits[platform].toLocaleString()} chars
-                      </div>
-                    </button>
-                  ))}
+                 {(['linkedin', 'instagram', 'facebook'] as const).map((platform) => (
+  <button
+    key={platform}
+    onClick={() => !['instagram', 'facebook'].includes(platform) ? handleTogglePlatform(platform) : undefined}
+    disabled={['instagram', 'facebook'].includes(platform)}
+    className={`p-3 border rounded-lg transition-all ${
+      ['instagram', 'facebook'].includes(platform)
+        ? 'bg-muted/30 border-border/40 text-muted-foreground/40 cursor-not-allowed opacity-50'
+        : selectedPlatforms.includes(platform)
+          ? 'bg-primary/10 border-primary text-primary'
+          : 'bg-background border-border text-muted-foreground hover:border-border/80'
+    }`}
+  >
+    <div className="text-sm font-medium capitalize">{platform}</div>
+    <div className="text-xs mt-1 opacity-60">
+      {['instagram', 'facebook'].includes(platform) ? 'Coming soon' : `${platformLimits[platform].toLocaleString()} chars`}
+    </div>
+  </button>
+))}
                 </div>
               </div>
 
