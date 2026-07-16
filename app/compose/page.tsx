@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/store/AuthContext';
 import { useAccounts } from '@/store/AccountsContext';
@@ -8,6 +8,7 @@ import { usePosts } from '@/store/PostsContext';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { RichTextEditor } from '@/components/features/RichTextEditor';
+import { uploadPostImage } from '@/lib/supabase/storage';
 
 const platformLimits: Record<string, number> = {
   facebook: 1000,
@@ -27,6 +28,11 @@ export default function ComposePage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Image upload state
+  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeLimit = selectedPlatforms.length > 0
     ? Math.min(...selectedPlatforms.map(p => platformLimits[p] ?? 3000))
@@ -60,6 +66,36 @@ export default function ComposePage() {
     );
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be under 5MB');
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      setError('');
+      const url = await uploadPostImage(file, user.id);
+      setMediaUrls((prev) => [...prev, url]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload image');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveImage = (url: string) => {
+    setMediaUrls((prev) => prev.filter((u) => u !== url));
+  };
+
   const handleSaveDraft = async () => {
     if (!user || !contentText.trim()) {
       setError('Please write something');
@@ -68,7 +104,7 @@ export default function ComposePage() {
     try {
       setError('');
       setSuccess('');
-      await createPost(user.id, contentText, selectedPlatforms);
+      await createPost(user.id, contentText, selectedPlatforms, mediaUrls);
       setSuccess('Draft saved successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -81,6 +117,10 @@ export default function ComposePage() {
       setError('Please write something');
       return;
     }
+    if (selectedPlatforms.includes('instagram') && mediaUrls.length === 0) {
+      setError('Instagram requires at least one image');
+      return;
+    }
     if (selectedAccounts.length === 0) {
       setError('Please select at least one account');
       return;
@@ -89,12 +129,13 @@ export default function ComposePage() {
       setError('');
       setSuccess('');
       setIsPublishing(true);
-      const post = await createPost(user.id, contentText, selectedPlatforms);
+      const post = await createPost(user.id, contentText, selectedPlatforms, mediaUrls);
       await publishPost(post.id, selectedAccounts);
       setSuccess('Post published successfully!');
       setContentHtml('');
       setContentText('');
       setSelectedAccounts([]);
+      setMediaUrls([]);
       setTimeout(() => router.push('/history'), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to publish post');
@@ -155,6 +196,47 @@ export default function ComposePage() {
                 )}
               </div>
 
+              {/* Image Upload */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Image
+                  {selectedPlatforms.includes('instagram') && (
+                    <span className="text-destructive text-xs ml-2">*required for Instagram</span>
+                  )}
+                </label>
+                <div className="flex flex-wrap gap-3">
+                  {mediaUrls.map((url) => (
+                    <div key={url} className="relative w-20 h-20">
+                      <img
+                        src={url}
+                        alt="upload"
+                        className="w-20 h-20 object-cover rounded-lg border border-border"
+                      />
+                      <button
+                        onClick={() => handleRemoveImage(url)}
+                        className="absolute -top-2 -right-2 bg-destructive text-white rounded-full w-5 h-5 text-xs flex items-center justify-center"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="w-20 h-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center text-muted-foreground hover:border-primary text-xs disabled:opacity-50"
+                  >
+                    {isUploading ? '...' : '+ Add'}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
               {/* Alerts */}
               {error && (
                 <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
@@ -173,25 +255,22 @@ export default function ComposePage() {
                   Platforms
                 </label>
                 <div className="grid grid-cols-3 gap-3">
-                 {(['linkedin', 'instagram', 'facebook'] as const).map((platform) => (
-  <button
-    key={platform}
-    onClick={() => !['instagram', 'facebook'].includes(platform) ? handleTogglePlatform(platform) : undefined}
-    disabled={['instagram', 'facebook'].includes(platform)}
-    className={`p-3 border rounded-lg transition-all ${
-      ['instagram', 'facebook'].includes(platform)
-        ? 'bg-muted/30 border-border/40 text-muted-foreground/40 cursor-not-allowed opacity-50'
-        : selectedPlatforms.includes(platform)
-          ? 'bg-primary/10 border-primary text-primary'
-          : 'bg-background border-border text-muted-foreground hover:border-border/80'
-    }`}
-  >
-    <div className="text-sm font-medium capitalize">{platform}</div>
-    <div className="text-xs mt-1 opacity-60">
-      {['instagram', 'facebook'].includes(platform) ? 'Coming soon' : `${platformLimits[platform].toLocaleString()} chars`}
-    </div>
-  </button>
-))}
+                  {(['linkedin', 'instagram', 'facebook'] as const).map((platform) => (
+                    <button
+                      key={platform}
+                      onClick={() => handleTogglePlatform(platform)}
+                      className={`p-3 border rounded-lg transition-all ${
+                        selectedPlatforms.includes(platform)
+                          ? 'bg-primary/10 border-primary text-primary'
+                          : 'bg-background border-border text-muted-foreground hover:border-border/80'
+                      }`}
+                    >
+                      <div className="text-sm font-medium capitalize">{platform}</div>
+                      <div className="text-xs mt-1 opacity-60">
+                        {platformLimits[platform].toLocaleString()} chars
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -276,6 +355,18 @@ export default function ComposePage() {
                   [&_img]:max-w-full [&_img]:rounded [&_h2]:font-bold [&_h2]:text-base"
                 dangerouslySetInnerHTML={{ __html: contentHtml || '<p class="text-muted-foreground">...</p>' }}
               />
+              {mediaUrls.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {mediaUrls.map((url) => (
+                    <img
+                      key={url}
+                      src={url}
+                      alt="preview"
+                      className="w-16 h-16 object-cover rounded border border-border"
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Tips */}

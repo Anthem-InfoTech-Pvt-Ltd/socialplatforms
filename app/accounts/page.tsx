@@ -44,6 +44,10 @@ export default function AccountsPage() {
       window.location.href = '/api/auth/linkedin'
       return
     }
+    if (platform === 'instagram') {
+      window.location.href = '/api/auth/instagram'
+      return
+    }
   }
 
   const handleDisconnect = async (accountId: string) => {

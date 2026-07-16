@@ -1,7 +1,7 @@
 export async function GET() {
   const params = new URLSearchParams({
     client_id: process.env.FACEBOOK_APP_ID!,
-    redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/facebook/callback`,
+    redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/instagram/callback`,
     config_id: process.env.FACEBOOK_LOGIN_CONFIG_ID!,
     response_type: 'code',
   })

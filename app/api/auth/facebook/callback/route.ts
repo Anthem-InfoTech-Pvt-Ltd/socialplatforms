@@ -23,16 +23,47 @@ export async function GET(request: Request) {
     })
   )
   const tokenData = await tokenRes.json()
+  console.log('USER ACCESS TOKEN:', tokenData.access_token)
 
   if (tokenData.error) {
     return Response.redirect(`${process.env.NEXTAUTH_URL}/accounts?error=token_failed`)
   }
 
-  // User ki Facebook pages fetch karo
+  // Step 1: Normal /me/accounts try karo
   const pagesRes = await fetch(
     `https://graph.facebook.com/v18.0/me/accounts?access_token=${tokenData.access_token}`
   )
   const pagesData = await pagesRes.json()
+  console.log('PAGES DATA (me/accounts):', JSON.stringify(pagesData, null, 2))
+
+  let pages = pagesData.data ?? []
+
+  // Step 2: Agar khaali aaye (Business Login for Business flow ka known issue),
+  // to known Page ID se seedha token derive karo
+  if (pages.length === 0) {
+    const knownPageIds = (process.env.FACEBOOK_KNOWN_PAGE_IDS || '1149660078237700')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean)
+
+    for (const pageId of knownPageIds) {
+      try {
+        const pageRes = await fetch(
+          `https://graph.facebook.com/v18.0/${pageId}?fields=id,name,access_token&access_token=${tokenData.access_token}`
+        )
+        const pageData = await pageRes.json()
+        if (pageData.access_token) {
+          pages.push(pageData)
+        } else {
+          console.log(`Fallback failed for page ${pageId}:`, JSON.stringify(pageData))
+        }
+      } catch (err) {
+        console.log(`Fallback error for page ${pageId}:`, String(err))
+      }
+    }
+  }
+
+  console.log('FINAL PAGES TO SAVE:', JSON.stringify(pages, null, 2))
 
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -42,8 +73,8 @@ export async function GET(request: Request) {
   }
 
   // Pages ko Supabase mein save karo
-  if (pagesData.data?.length > 0) {
-    for (const page of pagesData.data) {
+  if (pages.length > 0) {
+    for (const page of pages) {
       await supabase.from('social_accounts').upsert({
         user_id: user.id,
         platform: 'facebook',
@@ -54,7 +85,7 @@ export async function GET(request: Request) {
       }, { onConflict: 'user_id,account_id' })
     }
   } else {
-    // Agar pages nahi hain to user token save karo
+    // Agar phir bhi pages nahi milin to user token save karo (last resort)
     const meRes = await fetch(
       `https://graph.facebook.com/v18.0/me?fields=id,name&access_token=${tokenData.access_token}`
     )

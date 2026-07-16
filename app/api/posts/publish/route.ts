@@ -1,14 +1,13 @@
 // app/api/posts/publish/route.ts
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-// Helper function — HTML ko plain text mein convert karta hai
-// LinkedIn/Facebook plain text accept karte hain, raw HTML nahi
+// Helper function — Convert HTML to plain text
 function htmlToPlainText(html: string): string {
   return html
-    .replace(/<strong>(.*?)<\/strong>/gi, '*$1*')        // Bold → *text*
-    .replace(/<em>(.*?)<\/em>/gi, '_$1_')                // Italic → _text_
-    .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n$1\n') // Headings
-    .replace(/<li[^>]*>(.*?)<\/li>/gi, '\n• $1')         // List items → bullet
+    .replace(/<strong>(.*?)<\/strong>/gi, '*$1*')
+    .replace(/<em>(.*?)<\/em>/gi, '_$1_')
+    .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n$1\n')
+    .replace(/<li[^>]*>(.*?)<\/li>/gi, '\n• $1')
     .replace(/<ol[^>]*>(.*?)<\/ol>/gis, (_, content) => {
       let i = 1
       return content.replace(/<li[^>]*>(.*?)<\/li>/gi, () => `\n${i++}. $1`)
@@ -16,36 +15,58 @@ function htmlToPlainText(html: string): string {
     .replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gis, '\n"$1"\n')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<p[^>]*>(.*?)<\/p>/gis, '$1\n')
-    .replace(/<[^>]+>/g, '')                             // Remaining tags hata do
+    .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
-    .replace(/\n{3,}/g, '\n\n')                          // 3+ newlines → 2
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
 
-// Helper function — HTML se image URLs extract karta hai
-// (Abhi sirf collect karne ke liye, platform APIs mein image upload baad mein add hoga)
+// Extract image URLs from HTML — handles both single and double quoted src attrs
 function extractImageUrls(html: string): string[] {
-  const matches = html.matchAll(/<img[^>]+src="([^"]+)"/gi)
-  return [...matches].map(m => m[1]).filter(url => url.startsWith('http'))
+  const matches = html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)
+  return [...matches]
+    .map(match => match[1])
+    .filter(url => url.startsWith('http')) // data: URLs (base64) can't be used by FB/IG/LinkedIn APIs — they need a public URL
 }
 
 export async function POST(request: Request) {
   const { postId, accountIds } = await request.json()
+
   const supabase = await createServerSupabaseClient()
 
-  // Post content fetch karo
-  const { data: post } = await supabase
+  // Fetch post
+  const { data: post, error: postError } = await supabase
     .from('posts')
     .select('*')
     .eq('id', postId)
     .single()
 
-  // Content ko ek baar convert karo — sab accounts ke liye reuse hoga
+  if (postError || !post) {
+    return Response.json(
+      { success: false, error: 'Post not found' },
+      { status: 404 }
+    )
+  }
+
   const plainText = htmlToPlainText(post.content)
-  const imageUrls = extractImageUrls(post.content) // abhi sirf logging/future use ke liye
+
+  // Images upload karke alag se 'media_urls' column mein store hote hain (compose page
+  // ke upload button se), HTML content ke andar <img> tag ke roop mein nahi aate.
+  // Isliye pehle wahi column check karo; agar kisi purane post mein content ke andar
+  // hi <img> tag ho (paste kiya hua), toh fallback ke roop mein wahan se bhi nikaal lo.
+  //
+  // NOTE: agar tumhare Supabase schema mein column ka naam 'media_urls' nahi hai
+  // (jaise 'image_urls' ya 'media'), toh yahan wahi naam use karo.
+  const storedMediaUrls: string[] = Array.isArray(post.media_urls) ? post.media_urls : []
+  const imageUrls = storedMediaUrls.length > 0
+    ? storedMediaUrls
+    : extractImageUrls(post.content)
+
+  console.log('Plain Text:', plainText)
+  console.log('Images:', imageUrls)
 
   const results = []
 
@@ -56,70 +77,226 @@ export async function POST(request: Request) {
       .eq('id', accountId)
       .single()
 
-    try {
-      let platformPostId = null
+    if (!account) {
+      results.push({
+        accountId,
+        success: false,
+        error: 'Account not found',
+      })
+      continue
+    }
 
+    try {
+      let platformPostId: string | null = null
+
+      // ==========================
+      // FACEBOOK
+      // ==========================
       if (account.platform === 'facebook') {
-        const res = await fetch(
-          `https://graph.facebook.com/v18.0/${account.account_id}/feed`,
+        let res
+
+        if (imageUrls.length > 0) {
+          // Publish image post
+          res = await fetch(
+            `https://graph.facebook.com/v18.0/${account.account_id}/photos`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                url: imageUrls[0],
+                caption: plainText,
+                access_token: account.access_token,
+              }),
+            }
+          )
+        } else {
+          // Publish text post
+          res = await fetch(
+            `https://graph.facebook.com/v18.0/${account.account_id}/feed`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                message: plainText,
+                access_token: account.access_token,
+              }),
+            }
+          )
+        }
+
+        const data = await res.json()
+
+        console.log(
+          'Facebook post result:',
+          JSON.stringify(data, null, 2)
+        )
+
+        if (!res.ok || data.error) {
+          throw new Error(
+            data.error?.message || 'Facebook publish failed'
+          )
+        }
+
+        platformPostId = data.post_id || data.id
+      }
+
+      // ==========================
+      // INSTAGRAM
+      // ==========================
+      if (account.platform === 'instagram') {
+        // Instagram Graph API has no text-only feed post — an image (or video) is required
+        if (imageUrls.length === 0) {
+          throw new Error(
+            'Instagram requires at least one image — text-only posts are not supported'
+          )
+        }
+
+        // Step 1: create a media container
+        const containerRes = await fetch(
+          `https://graph.facebook.com/v18.0/${account.account_id}/media`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+            },
             body: JSON.stringify({
-              message: plainText, // ✅ plain text
-              access_token: account.access_token
-            })
+              image_url: imageUrls[0],
+              caption: plainText,
+              access_token: account.access_token,
+            }),
           }
         )
-        const data = await res.json()
-        console.log('Facebook post result:', JSON.stringify(data))
-        platformPostId = data.id
-      }
 
-      if (account.platform === 'linkedin') {
-        // LinkedIn API call (v2)
-        const res = await fetch('https://api.linkedin.com/v2/ugcPosts', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${account.access_token}`,
-            'Content-Type': 'application/json',
-            'X-Restli-Protocol-Version': '2.0.0',
-          },
-          body: JSON.stringify({
-            author: `urn:li:person:${account.account_id}`,
-            lifecycleState: 'PUBLISHED',
-            specificContent: {
-              'com.linkedin.ugc.ShareContent': {
-                shareCommentary: { text: plainText }, // ✅ plain text
-                shareMediaCategory: 'NONE'
-              }
+        const containerData = await containerRes.json()
+
+        console.log(
+          'Instagram container result:',
+          JSON.stringify(containerData, null, 2)
+        )
+
+        if (!containerRes.ok || containerData.error) {
+          throw new Error(
+            containerData.error?.message || 'Instagram container creation failed'
+          )
+        }
+
+        // Step 2: publish the container
+        const publishRes = await fetch(
+          `https://graph.facebook.com/v18.0/${account.account_id}/media_publish`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-            visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' }
-          })
-        })
+            body: JSON.stringify({
+              creation_id: containerData.id,
+              access_token: account.access_token,
+            }),
+          }
+        )
+
+        const publishData = await publishRes.json()
+
+        console.log(
+          'Instagram publish result:',
+          JSON.stringify(publishData, null, 2)
+        )
+
+        if (!publishRes.ok || publishData.error) {
+          throw new Error(
+            publishData.error?.message || 'Instagram publish failed'
+          )
+        }
+
+        platformPostId = publishData.id
+      }
+
+      // ==========================
+      // LINKEDIN
+      // ==========================
+      if (account.platform === 'linkedin') {
+        const res = await fetch(
+          'https://api.linkedin.com/v2/ugcPosts',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${account.access_token}`,
+              'Content-Type': 'application/json',
+              'X-Restli-Protocol-Version': '2.0.0',
+            },
+            body: JSON.stringify({
+              author: `urn:li:person:${account.account_id}`,
+              lifecycleState: 'PUBLISHED',
+              specificContent: {
+                'com.linkedin.ugc.ShareContent': {
+                  shareCommentary: {
+                    text: plainText,
+                  },
+                  shareMediaCategory: 'NONE',
+                },
+              },
+              visibility: {
+                'com.linkedin.ugc.MemberNetworkVisibility':
+                  'PUBLIC',
+              },
+            }),
+          }
+        )
+
         const data = await res.json()
-        console.log('LinkedIn post result:', JSON.stringify(data))
+
+        console.log(
+          'LinkedIn post result:',
+          JSON.stringify(data, null, 2)
+        )
+
+        if (!res.ok || data.serviceErrorCode) {
+          throw new Error(
+            data.message || 'LinkedIn publish failed'
+          )
+        }
+
         platformPostId = data.id
       }
 
-      // Engagement record banao
+      // Save engagement
       await supabase.from('post_engagements').insert({
         post_id: postId,
         platform: account.platform,
-        platform_post_id: platformPostId
+        platform_post_id: platformPostId,
       })
 
-      results.push({ accountId, success: true })
+      results.push({
+        accountId,
+        success: true,
+        platformPostId,
+      })
     } catch (err) {
-      results.push({ accountId, success: false, error: String(err) })
+      console.error(err)
+
+      results.push({
+        accountId,
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      })
     }
   }
 
-  // Post status update
+  // Update post status
   await supabase
     .from('posts')
-    .update({ status: 'published', published_at: new Date().toISOString() })
+    .update({
+      status: 'published',
+      published_at: new Date().toISOString(),
+    })
     .eq('id', postId)
 
-  return Response.json({ success: true, results })
+  return Response.json({
+    success: true,
+    results,
+  })
 }
