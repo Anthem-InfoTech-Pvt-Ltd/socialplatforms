@@ -35,6 +35,9 @@ export default function AccountsPage() {
   }, [user, loadAccounts]);
 
   const handleConnect = (platform: 'facebook' | 'instagram' | 'linkedin') => {
+    // Each platform can only have a single connected account.
+    if (connectedPlatforms.has(platform)) return;
+
     if (platform === 'facebook') {
       // Mock insert nahi — real OAuth redirect
       window.location.href = '/api/auth/facebook'
@@ -116,7 +119,7 @@ export default function AccountsPage() {
         {/* Available Platforms */}
         <div className="mb-8">
           <h2 className="text-xl font-bold text-foreground mb-4">
-            Connect New Platform
+            Connect a Platform
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {platforms.map((platform) => {
@@ -135,25 +138,23 @@ export default function AccountsPage() {
                     {platform}
                   </h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    {isConnected
-                      ? `${accounts.filter((a) => a.platform === platform).length} account connected`
-                      : 'Not connected yet'}
+                    {isConnected ? 'Account connected' : 'Not connected yet'}
                   </p>
                   <Button
                     onClick={() =>
                       handleConnect(platform as 'facebook' | 'instagram' | 'linkedin')
                     }
-                    disabled={connecting === platform || isLoading}
+                    disabled={isConnected || connecting === platform || isLoading}
                     className={
                       isConnected
-                        ? 'bg-green-600 hover:bg-green-700 text-white'
+                        ? 'bg-green-600 text-white opacity-80 cursor-default hover:bg-green-600'
                         : 'bg-primary hover:bg-primary/90 text-primary-foreground'
                     }
                   >
                     {connecting === platform
                       ? 'Connecting...'
                       : isConnected
-                        ? 'Add Another'
+                        ? 'Connected'
                         : 'Connect'}
                   </Button>
                 </div>
