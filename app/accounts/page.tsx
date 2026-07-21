@@ -7,6 +7,17 @@ import { useAccounts } from '@/store/AccountsContext';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { SocialAccount } from '@/types';
+import { LinkedinIcon, InstagramIcon, FacebookIcon } from '@/components/features/SocialIcons';
+
+const platformMeta: Record<string, { label: string; icon: typeof LinkedinIcon; bg: string }> = {
+  facebook: { label: 'Facebook', icon: FacebookIcon, bg: '#1877F2' },
+  instagram: {
+    label: 'Instagram',
+    icon: InstagramIcon,
+    bg: 'radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%)',
+  },
+  linkedin: { label: 'LinkedIn', icon: LinkedinIcon, bg: '#0A66C2' },
+}
 
 export default function AccountsPage() {
   const router = useRouter();
@@ -124,18 +135,20 @@ export default function AccountsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {platforms.map((platform) => {
               const isConnected = connectedPlatforms.has(platform);
+              const Icon = platformMeta[platform].icon;
               return (
                 <div
                   key={platform}
                   className="bg-card border border-border rounded-lg p-6 flex flex-col items-center text-center"
                 >
-                  <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                    <span className="text-2xl font-bold text-primary capitalize">
-                      {platform.charAt(0)}
-                    </span>
+                  <div
+                    className="w-16 h-16 rounded-lg flex items-center justify-center mb-4"
+                    style={{ background: platformMeta[platform].bg }}
+                  >
+                    <Icon className="w-7 h-7 text-white" />
                   </div>
                   <h3 className="font-semibold text-foreground capitalize mb-2">
-                    {platform}
+                    {platformMeta[platform].label}
                   </h3>
                   <p className="text-sm text-muted-foreground mb-4">
                     {isConnected ? 'Account connected' : 'Not connected yet'}
@@ -170,37 +183,45 @@ export default function AccountsPage() {
           </h2>
           {accounts.length > 0 ? (
             <div className="space-y-4">
-              {accounts.map((account) => (
-                <div
-                  key={account.id}
-                  className="bg-card border border-border rounded-lg p-6 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                      <span className="font-bold text-primary capitalize">
-                        {account.platform.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground">
-                        {account.accountName}
-                      </h3>
-                      <p className="text-sm text-muted-foreground capitalize">
-                        {account.platform}
-                      </p>
-                      <p className="text-xs text-green-500 mt-1">✓ Connected</p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => handleDisconnect(account.id)}
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:bg-destructive/10"
+              {accounts.map((account) => {
+                const Icon = platformMeta[account.platform]?.icon;
+                return (
+                  <div
+                    key={account.id}
+                    className="bg-card border border-border rounded-lg p-6 flex items-center justify-between"
                   >
-                    Disconnect
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
+                        style={{
+                          background: Icon
+                            ? platformMeta[account.platform]?.bg
+                            : undefined,
+                        }}
+                      >
+                        {Icon && <Icon className="w-5 h-5 text-white" />}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">
+                          {account.accountName}
+                        </h3>
+                        <p className="text-sm text-muted-foreground capitalize">
+                          {platformMeta[account.platform]?.label ?? account.platform}
+                        </p>
+                        <p className="text-xs text-green-500 mt-1">✓ Connected</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => handleDisconnect(account.id)}
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive/10"
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="bg-card border border-border rounded-lg p-8 text-center">

@@ -31,7 +31,7 @@ export default function ComposePage() {
   const { createPost, publishPost, isLoading: postsLoading } = usePosts();
   const [contentHtml, setContentHtml] = useState('');
   const [contentText, setContentText] = useState('');
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['linkedin']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['linkedin', 'instagram', 'facebook']);
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState('');
