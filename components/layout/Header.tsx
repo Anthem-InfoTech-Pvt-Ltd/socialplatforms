@@ -31,14 +31,18 @@ export function Header() {
     <header className="border-b border-border bg-card sticky top-0 z-50">
       <div className="flex items-center justify-between px-20 h-20">
         {/* Logo */}
-        <Link href="/dashboard" className="flex items-center gap-2.5 shrink-0">
-          <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-lg tracking-tight">S</span>
-          </div>
-          <span className="text-xl font-semibold text-foreground tracking-tight hidden sm:inline">
-            SocialHub
-          </span>
-        </Link>
+       <Link href="/dashboard" className="flex items-center gap-2.5 shrink-0">
+  <div className="w-11 h-11 rounded-full flex items-center justify-center overflow-hidden ring-1 ring-border shadow-sm bg-card">
+    <img
+      src="/image/logo.png"
+      alt="Logo"
+      className="w-full h-full object-contain"
+    />
+  </div>
+  <span className="text-2xl font-semibold text-foreground tracking-tight hidden sm:inline">
+    SocialHub
+  </span>
+</Link>
 
         {/* Nav — text only */}
         <nav className="hidden md:flex items-center gap-1">
