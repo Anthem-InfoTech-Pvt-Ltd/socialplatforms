@@ -1,6 +1,8 @@
 // app/api/posts/publish/route.ts
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
+const INSTAGRAM_CAPTION_LIMIT = 2200
+
 // Helper function — Convert HTML to plain text
 function htmlToPlainText(html: string): string {
   return html
@@ -66,6 +68,7 @@ export async function POST(request: Request) {
     : extractImageUrls(post.content)
 
   console.log('Plain Text:', plainText)
+  console.log('Plain Text length:', plainText.length)
   console.log('Images:', imageUrls)
 
   const results = []
@@ -80,6 +83,7 @@ export async function POST(request: Request) {
     if (!account) {
       results.push({
         accountId,
+        platform: null,
         success: false,
         error: 'Account not found',
       })
@@ -155,6 +159,18 @@ export async function POST(request: Request) {
           )
         }
 
+        // Instagram caption hard limit is 2,200 characters. Facebook doesn't enforce
+        // this, so a long post can silently succeed on FB but fail on IG's container
+        // creation step. Trim it here so the request never gets rejected for length,
+        // and log a warning so we know it happened.
+        let igCaption = plainText
+        if (igCaption.length > INSTAGRAM_CAPTION_LIMIT) {
+          console.warn(
+            `Instagram caption too long (${igCaption.length} chars) — truncating to ${INSTAGRAM_CAPTION_LIMIT}`
+          )
+          igCaption = igCaption.slice(0, INSTAGRAM_CAPTION_LIMIT - 1) + '…'
+        }
+
         // Step 1: create a media container
         const containerRes = await fetch(
           `https://graph.facebook.com/v18.0/${account.account_id}/media`,
@@ -165,7 +181,7 @@ export async function POST(request: Request) {
             },
             body: JSON.stringify({
               image_url: imageUrls[0],
-              caption: plainText,
+              caption: igCaption,
               access_token: account.access_token,
             }),
           }
@@ -180,7 +196,9 @@ export async function POST(request: Request) {
 
         if (!containerRes.ok || containerData.error) {
           throw new Error(
-            containerData.error?.message || 'Instagram container creation failed'
+            containerData.error?.message
+              || containerData.error?.error_user_msg
+              || 'Instagram container creation failed'
           )
         }
 
@@ -208,7 +226,9 @@ export async function POST(request: Request) {
 
         if (!publishRes.ok || publishData.error) {
           throw new Error(
-            publishData.error?.message || 'Instagram publish failed'
+            publishData.error?.message
+              || publishData.error?.error_user_msg
+              || 'Instagram publish failed'
           )
         }
 
@@ -272,14 +292,16 @@ export async function POST(request: Request) {
 
       results.push({
         accountId,
+        platform: account.platform,
         success: true,
         platformPostId,
       })
     } catch (err) {
-      console.error(err)
+      console.error(`Publish failed for account ${accountId} (${account.platform}):`, err)
 
       results.push({
         accountId,
+        platform: account.platform,
         success: false,
         error: err instanceof Error ? err.message : String(err),
       })
@@ -295,8 +317,10 @@ export async function POST(request: Request) {
     })
     .eq('id', postId)
 
+  const allFailed = results.length > 0 && results.every((r) => !r.success)
+
   return Response.json({
-    success: true,
+    success: !allFailed,
     results,
   })
 }

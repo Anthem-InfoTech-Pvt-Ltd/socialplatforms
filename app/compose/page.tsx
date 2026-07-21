@@ -138,13 +138,44 @@ export default function ComposePage() {
       setSuccess('');
       setIsPublishing(true);
       const post = await createPost(user.id, contentText, selectedPlatforms, mediaUrls);
-      await publishPost(post.id, selectedAccounts);
-      setSuccess('Post published successfully!');
+      const response = await publishPost(post.id, selectedAccounts);
+
+      // publishPost se aane wale results array mein har account/platform ka
+      // alag-alag success/error hota hai — isko ignore mat karo, warna
+      // "Facebook pe chala gaya, Instagram pe fail hua" jaisa case silently
+      // "Post published successfully!" dikha dega.
+      const results: Array<{ platform: string; success: boolean; error?: string }> =
+        response?.results ?? [];
+
+      const failed = results.filter((r) => !r.success);
+      const succeeded = results.filter((r) => r.success);
+
+      if (failed.length === 0) {
+        setSuccess('Post published successfully!');
+      } else if (succeeded.length === 0) {
+        setError(
+          failed
+            .map((f) => `${f.platform ?? 'Unknown'}: ${f.error ?? 'Failed'}`)
+            .join(' | ')
+        );
+      } else {
+        // Partial success — kuch platform pe gaya, kuch pe nahi
+        setSuccess(`Published to: ${succeeded.map((s) => s.platform).join(', ')}`);
+        setError(
+          failed
+            .map((f) => `${f.platform ?? 'Unknown'} failed: ${f.error ?? 'Unknown error'}`)
+            .join(' | ')
+        );
+      }
+
       setContentHtml('');
       setContentText('');
       setSelectedAccounts([]);
       setMediaUrls([]);
-      setTimeout(() => router.push('/history'), 2000);
+
+      if (failed.length === 0) {
+        setTimeout(() => router.push('/history'), 2000);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to publish post');
     } finally {
