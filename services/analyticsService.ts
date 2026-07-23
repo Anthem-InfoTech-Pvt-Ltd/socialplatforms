@@ -1,6 +1,6 @@
 import { AnalyticsData, DashboardStats, Post } from '@/types';
 
-// Mock analytics data
+// Mock data — only used by the Analytics page charts, not the Dashboard stats below.
 const generateMockAnalytics = (): AnalyticsData[] => {
   const data: AnalyticsData[] = [];
   const platforms = ['facebook', 'instagram', 'linkedin'];
@@ -27,20 +27,9 @@ const generateMockAnalytics = (): AnalyticsData[] => {
 
 let mockAnalyticsData = generateMockAnalytics();
 
-// TODO: Replace with real analytics data from APIs
-// Integration points:
-// - Facebook Analytics API
-// - Instagram Insights API
-// - LinkedIn Analytics API
-// - Data warehouse for historical data (BigQuery, Redshift, etc.)
-// - Real-time data pipeline for live metrics
-
 export const analyticsService = {
   async getDashboardStats(userId: string, posts: Post[]): Promise<DashboardStats> {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 400));
-
-    const totalFollowers = Math.floor(Math.random() * 50000) + 10000;
+    // Fully derived from real posts + post_engagements — no Math.random() here anymore.
     const totalEngagement = posts.reduce(
       (sum, p) =>
         sum +
@@ -49,6 +38,7 @@ export const analyticsService = {
         p.engagement.shares,
       0
     );
+
     const topPerformingPost =
       posts.length > 0
         ? posts.reduce((top, post) => {
@@ -64,13 +54,8 @@ export const analyticsService = {
           })
         : null;
 
-    // TODO: Fetch real data from APIs
-    // - Query analytics APIs for follower counts
-    // - Calculate engagement rates
-    // - Get trending content
-
     return {
-      totalFollowers,
+      totalFollowers: 0, // TODO: needs real FB/IG/LinkedIn insights API integration
       totalEngagement,
       averageEngagementRate: posts.length > 0 ? totalEngagement / posts.length : 0,
       topPerformingPost,
@@ -83,7 +68,6 @@ export const analyticsService = {
     startDate?: Date,
     endDate?: Date
   ): Promise<AnalyticsData[]> {
-    // Simulate API delay
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     let data = mockAnalyticsData;
@@ -101,11 +85,6 @@ export const analyticsService = {
       });
     }
 
-    // TODO: Query analytics database
-    // - Aggregate data by platform
-    // - Calculate daily/weekly/monthly trends
-    // - Compare with previous periods
-
     return data;
   },
 
@@ -118,13 +97,7 @@ export const analyticsService = {
     avg_post_reach: number;
     top_content_type: string;
   }> {
-    // Simulate API delay
     await new Promise((resolve) => setTimeout(resolve, 300));
-
-    // TODO: Fetch real platform metrics
-    // - Call platform-specific APIs
-    // - Cache results
-    // - Handle rate limits
 
     return {
       followers: Math.floor(Math.random() * 50000) + 10000,
@@ -143,13 +116,7 @@ export const analyticsService = {
     clicks: number;
     shares: number;
   }> {
-    // Simulate API delay
     await new Promise((resolve) => setTimeout(resolve, 300));
-
-    // TODO: Fetch detailed post metrics
-    // - Query each platform for post-specific data
-    // - Aggregate cross-platform metrics
-    // - Track sentiment if available
 
     return {
       views: Math.floor(Math.random() * 5000) + 500,

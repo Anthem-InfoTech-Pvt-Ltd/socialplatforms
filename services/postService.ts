@@ -1,6 +1,33 @@
 import { createClient } from '@/lib/supabase/client'
+import { Post, PostEngagement } from '@/types'
 
 const supabase = createClient()
+
+function mapPost(row: any): Post {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    content: row.content,
+    mediaUrls: Array.isArray(row.media_urls) ? row.media_urls : [],
+    platforms: row.platforms ?? [],
+    status: row.status,
+    scheduledAt: row.scheduled_at ? new Date(row.scheduled_at) : undefined,
+    publishedAt: row.published_at ? new Date(row.published_at) : undefined,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+    engagement: mapEngagement(row.post_engagements),
+  }
+}
+
+function mapEngagement(rows: any): PostEngagement {
+  const e = Array.isArray(rows) ? rows[0] : rows
+  return {
+    likes: e?.likes ?? 0,
+    comments: e?.comments ?? 0,
+    shares: e?.shares ?? 0,
+    views: e?.views ?? 0,
+  }
+}
 
 export const postService = {
   async getPosts(userId: string, status?: string) {
@@ -16,10 +43,7 @@ export const postService = {
     const { data, error } = await query
     if (error) throw new Error(error.message)
 
-    return data.map(p => ({
-      ...p,
-      engagement: p.post_engagements?.[0] ?? { likes: 0, comments: 0, shares: 0, views: 0 }
-    }))
+    return (data ?? []).map(mapPost)
   },
 
   async getPostById(postId: string) {
@@ -31,10 +55,7 @@ export const postService = {
 
     if (error) return null
 
-    return {
-      ...data,
-      engagement: data.post_engagements?.[0] ?? { likes: 0, comments: 0, shares: 0, views: 0 }
-    }
+    return mapPost(data)
   },
 
   async createPost(userId: string, content: string, platforms: string[], mediaUrls: string[] = []) {
@@ -51,7 +72,7 @@ export const postService = {
       .single()
 
     if (error) throw new Error(error.message)
-    return data
+    return mapPost(data)
   },
 
   async publishPost(postId: string, accountIds: string[]) {
@@ -74,7 +95,7 @@ export const postService = {
       .single()
 
     if (error) throw new Error(error.message)
-    return data
+    return mapPost(data)
   },
 
   async deletePost(postId: string) {
@@ -95,6 +116,6 @@ export const postService = {
       .single()
 
     if (error) throw new Error(error.message)
-    return data
+    return mapPost(data)
   }
 }

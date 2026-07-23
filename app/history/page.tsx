@@ -129,21 +129,30 @@ export default function HistoryPage() {
               >
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <p className="text-foreground font-medium mb-2">{post.content}</p>
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {post.platforms.map((platform) => (
-                        <span
-                          key={platform}
-                          className="inline-block text-xs px-2 py-1 bg-primary/10 text-primary rounded capitalize"
-                        >
-                          {platform}
-                        </span>
-                      ))}
+                  <div className="flex-1 flex gap-4">
+                    {post.mediaUrls?.[0] && (
+                      <img
+                        src={post.mediaUrls[0]}
+                        alt="post media"
+                        className="w-20 h-20 object-cover rounded-lg border border-border shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-foreground font-medium mb-2">{post.content}</p>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {post.platforms.map((platform) => (
+                          <span
+                            key={platform}
+                            className="inline-block text-xs px-2 py-1 bg-primary/10 text-primary rounded capitalize"
+                          >
+                            {platform}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadgeColor(
+                    className={`px-3 py-1 rounded-full text-xs font-semibold border shrink-0 ${getStatusBadgeColor(
                       post.status
                     )}`}
                   >

@@ -20,14 +20,12 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Redirect to login if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/login');
     }
   }, [isAuthenticated, authLoading, router]);
 
-  // Load data
   useEffect(() => {
     if (user) {
       const loadData = async () => {
@@ -47,7 +45,6 @@ export default function DashboardPage() {
     }
   }, [user, loadPosts, loadAccounts]);
 
-  // Load stats
   useEffect(() => {
     if (user && posts.length > 0) {
       const loadStats = async () => {
@@ -88,6 +85,29 @@ export default function DashboardPage() {
   const scheduledPosts = posts.filter((p) => p.status === 'scheduled');
   const draftPosts = posts.filter((p) => p.status === 'draft');
 
+  // Real week-over-week comparison for Published Posts trend — no hardcoded numbers.
+  const now = new Date();
+  const startOfThisWeek = new Date(now);
+  startOfThisWeek.setDate(now.getDate() - 7);
+  const startOfLastWeek = new Date(now);
+  startOfLastWeek.setDate(now.getDate() - 14);
+
+  const publishedThisWeek = publishedPosts.filter(
+    (p) => p.publishedAt && new Date(p.publishedAt) >= startOfThisWeek
+  ).length;
+  const publishedLastWeek = publishedPosts.filter(
+    (p) =>
+      p.publishedAt &&
+      new Date(p.publishedAt) >= startOfLastWeek &&
+      new Date(p.publishedAt) < startOfThisWeek
+  ).length;
+
+  const hasPublishedTrend = publishedThisWeek > 0 || publishedLastWeek > 0;
+  const publishedTrendValue =
+    publishedLastWeek > 0
+      ? Math.round(((publishedThisWeek - publishedLastWeek) / publishedLastWeek) * 100)
+      : 100;
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -108,17 +128,19 @@ export default function DashboardPage() {
           <StatCard
             label="Total Followers"
             value={stats?.totalFollowers.toLocaleString() || '0'}
-            trend={{ value: 12, isPositive: true }}
           />
           <StatCard
             label="Total Engagement"
             value={stats?.totalEngagement || '0'}
-            trend={{ value: 8, isPositive: true }}
           />
           <StatCard
             label="Published Posts"
             value={publishedPosts.length}
-            trend={{ value: 5, isPositive: true }}
+            trend={
+              hasPublishedTrend
+                ? { value: Math.abs(publishedTrendValue), isPositive: publishedTrendValue >= 0 }
+                : undefined
+            }
           />
           <StatCard
             label="Scheduled Posts"
@@ -193,21 +215,32 @@ export default function DashboardPage() {
                   key={post.id}
                   className="bg-card border border-border rounded-lg p-4"
                 >
-                  <p className="text-foreground font-medium mb-2">{post.content}</p>
-                  <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                    <span>👍 {post.engagement.likes} Likes</span>
-                    <span>💬 {post.engagement.comments} Comments</span>
-                    <span>🔄 {post.engagement.shares} Shares</span>
-                  </div>
-                  <div className="flex gap-2 mt-3">
-                    {post.platforms.map((platform) => (
-                      <span
-                        key={platform}
-                        className="inline-block text-xs px-2 py-1 bg-primary/10 text-primary rounded capitalize"
-                      >
-                        {platform}
-                      </span>
-                    ))}
+                  <div className="flex gap-4">
+                    {post.mediaUrls?.[0] && (
+                      <img
+                        src={post.mediaUrls[0]}
+                        alt="post media"
+                        className="w-16 h-16 object-cover rounded-lg border border-border shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-foreground font-medium mb-2">{post.content}</p>
+                      <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                        <span>👍 {post.engagement.likes} Likes</span>
+                        <span>💬 {post.engagement.comments} Comments</span>
+                        <span>🔄 {post.engagement.shares} Shares</span>
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        {post.platforms.map((platform) => (
+                          <span
+                            key={platform}
+                            className="inline-block text-xs px-2 py-1 bg-primary/10 text-primary rounded capitalize"
+                          >
+                            {platform}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
