@@ -1,6 +1,13 @@
 import { createClient } from '@/lib/supabase/client'
 import { Post, PostEngagement } from '@/types'
 
+// OPTIONAL MIGRATION — only needed if you want `location` / `internalNotes` to
+// actually persist in Supabase. Without running this, createPost() still works
+// exactly as before (it just detects the missing columns and retries without them).
+//
+//   alter table posts add column if not exists location text;
+//   alter table posts add column if not exists internal_notes text;
+
 const supabase = createClient()
 
 function mapPost(row: any): Post {
@@ -11,6 +18,8 @@ function mapPost(row: any): Post {
     mediaUrls: Array.isArray(row.media_urls) ? row.media_urls : [],
     platforms: row.platforms ?? [],
     status: row.status,
+    location: row.location ?? undefined,
+    internalNotes: row.internal_notes ?? undefined,
     scheduledAt: row.scheduled_at ? new Date(row.scheduled_at) : undefined,
     publishedAt: row.published_at ? new Date(row.published_at) : undefined,
     createdAt: new Date(row.created_at),
@@ -27,6 +36,11 @@ function mapEngagement(rows: any): PostEngagement {
     shares: e?.shares ?? 0,
     views: e?.views ?? 0,
   }
+}
+
+// Supabase/Postgres reports a missing column as code 42703 (undefined_column).
+function isMissingColumnError(error: any): boolean {
+  return error?.code === '42703' || /column .* does not exist/i.test(error?.message ?? '')
 }
 
 export const postService = {
@@ -58,18 +72,47 @@ export const postService = {
     return mapPost(data)
   },
 
-  async createPost(userId: string, content: string, platforms: string[], mediaUrls: string[] = []) {
-    const { data, error } = await supabase
+  async createPost(
+    userId: string,
+    content: string,
+    platforms: string[],
+    mediaUrls: string[] = [],
+    location?: string,
+    internalNotes?: string
+  ) {
+    const basePayload = {
+      user_id: userId,
+      content,
+      platforms,
+      media_urls: mediaUrls,
+      status: 'draft',
+    }
+
+    const extendedPayload = {
+      ...basePayload,
+      ...(location ? { location } : {}),
+      ...(internalNotes ? { internal_notes: internalNotes } : {}),
+    }
+
+    let { data, error } = await supabase
       .from('posts')
-      .insert({
-        user_id: userId,
-        content,
-        platforms,
-        media_urls: mediaUrls,
-        status: 'draft'
-      })
+      .insert(extendedPayload)
       .select()
       .single()
+
+    // Graceful degrade: if location/internal_notes columns don't exist yet,
+    // retry with the original payload so post creation still succeeds.
+    if (error && isMissingColumnError(error)) {
+      console.warn(
+        'posts.location / posts.internal_notes column missing — saving without them. ' +
+        'Run the migration in the comment at the top of postService.ts to enable them.'
+      )
+      ;({ data, error } = await supabase
+        .from('posts')
+        .insert(basePayload)
+        .select()
+        .single())
+    }
 
     if (error) throw new Error(error.message)
     return mapPost(data)

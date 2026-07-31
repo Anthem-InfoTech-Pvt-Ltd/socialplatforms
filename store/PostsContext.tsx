@@ -9,7 +9,14 @@ interface PostsContextType {
   isLoading: boolean;
   error: string | null;
   loadPosts: (userId: string) => Promise<void>;
-  createPost: (userId: string, content: string, platforms: string[], mediaUrls?: string[]) => Promise<Post>;
+  createPost: (
+    userId: string,
+    content: string,
+    platforms: string[],
+    mediaUrls?: string[],
+    location?: string,
+    internalNotes?: string
+  ) => Promise<Post>;
   updatePost: (postId: string, updates: Partial<Post>) => Promise<Post>;
   deletePost: (postId: string) => Promise<void>;
   publishPost: (postId: string, accountIds: string[]) => Promise<boolean>;
@@ -36,15 +43,32 @@ export function PostsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const createPost = useCallback(async (userId: string, content: string, platforms: string[], mediaUrls: string[] = []) => {
-    try {
-      const newPost = await postService.createPost(userId, content, platforms, mediaUrls);
-      setPosts((prev) => [newPost, ...prev]);
-      return newPost;
-    } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to create post');
-    }
-  }, []);
+  const createPost = useCallback(
+    async (
+      userId: string,
+      content: string,
+      platforms: string[],
+      mediaUrls: string[] = [],
+      location?: string,
+      internalNotes?: string
+    ) => {
+      try {
+        const newPost = await postService.createPost(
+          userId,
+          content,
+          platforms,
+          mediaUrls,
+          location,
+          internalNotes
+        );
+        setPosts((prev) => [newPost, ...prev]);
+        return newPost;
+      } catch (err) {
+        throw err instanceof Error ? err : new Error('Failed to create post');
+      }
+    },
+    []
+  );
 
   const updatePost = useCallback(async (postId: string, updates: Partial<Post>) => {
     try {

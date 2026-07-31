@@ -1,19 +1,45 @@
 'use client'
 
+import { useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import CharacterCount from '@tiptap/extension-character-count'
-import { Eraser } from 'lucide-react'
+import Link from '@tiptap/extension-link'
+import { Eraser, ImagePlus, Loader2, X } from 'lucide-react'
+import { EmojiPicker } from './EmojiPicker'
+import { HashtagSuggestions } from './HashtagSuggestions'
+import { UtmLinkBuilder } from './UtmLinkBuilder'
+import { SavedTexts } from './SavedTexts'
 
 interface RichTextEditorProps {
   content: string
   onChange: (html: string, text: string) => void
   placeholder?: string
   maxLength?: number
+  // Image attachment — lives in the same toolbar row as emoji/hashtag/link/saved texts.
+  // Upload logic (validation, Supabase call, setMediaUrls) stays in the parent; this
+  // component just triggers the file picker and renders the toolbar icon + thumbnails.
+  mediaUrls?: string[]
+  onImageUpload?: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onRemoveImage?: (url: string) => void
+  isUploadingImage?: boolean
+  imageHint?: string
 }
 
-export function RichTextEditor({ content, onChange, placeholder = "What's on your mind?", maxLength = 3000 }: RichTextEditorProps) {
+export function RichTextEditor({
+  content,
+  onChange,
+  placeholder = "What's on your mind?",
+  maxLength = 3000,
+  mediaUrls = [],
+  onImageUpload,
+  onRemoveImage,
+  isUploadingImage = false,
+  imageHint,
+}: RichTextEditorProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -31,6 +57,18 @@ export function RichTextEditor({ content, onChange, placeholder = "What's on you
       }),
       Placeholder.configure({ placeholder }),
       CharacterCount.configure({ limit: maxLength }),
+      // Lets the "Insert link" tool show custom display text instead of the raw
+      // URL, and makes it clickable (opens in a new tab) both while editing
+      // and wherever this HTML is rendered (e.g. the Preview panel).
+      Link.configure({
+        openOnClick: true,
+        autolink: true,
+        HTMLAttributes: {
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          class: 'text-primary underline underline-offset-2 cursor-pointer',
+        },
+      }),
     ],
     content,
     immediatelyRender: false,
@@ -51,9 +89,15 @@ export function RichTextEditor({ content, onChange, placeholder = "What's on you
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference - (Math.min(percentage, 100) / 100) * circumference
 
+  // Insert plain text (or a small HTML fragment, e.g. a link) at the current
+  // cursor position, then refocus the editor.
+  const insertAtCursor = (content: string) => {
+    editor.chain().focus().insertContent(content).run()
+  }
+
   return (
     <div
-      className={`border rounded-xl overflow-hidden bg-background shadow-sm transition-all ${
+      className={`border rounded-xl bg-background shadow-sm transition-all ${
         isAtLimit
           ? 'border-destructive ring-1 ring-destructive/20'
           : 'border-border focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/10'
@@ -81,22 +125,89 @@ export function RichTextEditor({ content, onChange, placeholder = "What's on you
         "
       />
 
-      {/* Footer */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-t border-border/60 bg-muted/20">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            editor.commands.clearContent()
-          }}
-          disabled={charCount === 0}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground/70 hover:text-destructive disabled:opacity-40 disabled:pointer-events-none transition-colors"
+      {/* Attached image thumbnails — shown inside the editor, right above the toolbar */}
+      {mediaUrls.length > 0 && (
+        <div
+          className="flex flex-wrap gap-2 px-4 pb-3 pt-1 border-t border-border/60"
+          onClick={(e) => e.stopPropagation()}
         >
-          <Eraser className="w-3.5 h-3.5" />
-          Clear
-        </button>
+          {mediaUrls.map((url) => (
+            <div key={url} className="group relative w-14 h-14 rounded-lg overflow-hidden border border-border shrink-0">
+              <img src={url} alt="attached" className="w-full h-full object-cover" />
+              {onRemoveImage && (
+                <button
+                  type="button"
+                  onClick={() => onRemoveImage(url)}
+                  className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Footer / toolbar */}
+      <div
+        className="flex items-center justify-between px-4 py-2.5 border-t border-border/60 bg-muted/20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              editor.commands.clearContent()
+            }}
+            disabled={charCount === 0}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground/70 hover:text-destructive disabled:opacity-40 disabled:pointer-events-none transition-colors mr-1.5 pr-1.5 border-r border-border/60"
+            title="Clear content"
+          >
+            <Eraser className="w-3.5 h-3.5" />
+          </button>
+
+          <EmojiPicker onSelect={insertAtCursor} />
+          <HashtagSuggestions onSelect={insertAtCursor} />
+          <UtmLinkBuilder onInsert={insertAtCursor} />
+          <SavedTexts onInsert={insertAtCursor} />
+
+          {onImageUpload && (
+            <>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingImage}
+                className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+                title={imageHint ? `Add image (${imageHint})` : 'Add image'}
+              >
+                {isUploadingImage ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="w-4 h-4" />
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  onImageUpload(e)
+                  if (fileInputRef.current) fileInputRef.current.value = ''
+                }}
+                className="hidden"
+              />
+            </>
+          )}
+        </div>
 
         <div className="flex items-center gap-3">
+          {imageHint && (
+            <span className="text-[11px] font-medium text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
+              {imageHint}
+            </span>
+          )}
+
           {isNearLimit && (
             <span className={`text-xs ${isAtLimit ? 'text-destructive font-medium' : 'text-amber-500'}`}>
               {isAtLimit ? 'Limit reached' : `${maxLength - charCount} left`}

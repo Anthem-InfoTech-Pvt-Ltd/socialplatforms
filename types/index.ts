@@ -40,6 +40,8 @@ export interface Post {
   mediaUrls: string[];
   platforms: ('facebook' | 'instagram' | 'linkedin')[];
   status: 'draft' | 'scheduled' | 'published' | 'failed';
+  location?: string;       // Optional location tag shown in preview / appended on publish
+  internalNotes?: string;  // Internal-only note, never sent to the platforms
   scheduledAt?: Date;
   publishedAt?: Date;
   engagement: PostEngagement;
@@ -58,6 +60,8 @@ export interface PostComposerData {
   content: string;
   mediaUrls: string[];
   platforms: ('facebook' | 'instagram' | 'linkedin')[];
+  location?: string;
+  internalNotes?: string;
   scheduledAt?: Date;
 }
 
