@@ -251,6 +251,89 @@ export async function POST(request: Request) {
       // LINKEDIN
       // ==========================
       if (account.platform === 'linkedin') {
+        const authorUrn = `urn:li:person:${account.account_id}`
+
+        // Unlike FB/IG, LinkedIn's UGC API can't take an image URL directly —
+        // the image has to be registered as an asset, then its raw bytes
+        // uploaded to LinkedIn's own upload URL, before it can be referenced
+        // in the post. This is why LinkedIn was only ever getting text before.
+        let media: any[] = []
+
+        if (imageUrls.length > 0) {
+          try {
+            const registerRes = await fetch(
+              'https://api.linkedin.com/v2/assets?action=registerUpload',
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${account.access_token}`,
+                  'Content-Type': 'application/json',
+                  'X-Restli-Protocol-Version': '2.0.0',
+                },
+                body: JSON.stringify({
+                  registerUploadRequest: {
+                    recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+                    owner: authorUrn,
+                    serviceRelationships: [
+                      {
+                        relationshipType: 'OWNER',
+                        identifier: 'urn:li:userGeneratedContent',
+                      },
+                    ],
+                  },
+                }),
+              }
+            )
+            const registerData = await registerRes.json()
+
+            console.log(
+              'LinkedIn register upload result:',
+              JSON.stringify(registerData, null, 2)
+            )
+
+            if (!registerRes.ok || registerData.error) {
+              throw new Error(
+                registerData.message || 'LinkedIn image upload registration failed'
+              )
+            }
+
+            const uploadUrl =
+              registerData.value.uploadMechanism[
+                'com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'
+              ].uploadUrl
+            const asset = registerData.value.asset
+
+            // Pull the image bytes from our own public Supabase URL, then hand
+            // them straight to LinkedIn's upload URL.
+            const imageBytesRes = await fetch(imageUrls[0])
+            const imageBuffer = await imageBytesRes.arrayBuffer()
+
+            const uploadRes = await fetch(uploadUrl, {
+              method: 'PUT',
+              headers: { Authorization: `Bearer ${account.access_token}` },
+              body: imageBuffer,
+            })
+
+            if (!uploadRes.ok) {
+              throw new Error('LinkedIn image upload failed')
+            }
+
+            media = [
+              {
+                status: 'READY',
+                description: { text: '' },
+                media: asset,
+                title: { text: '' },
+              },
+            ]
+          } catch (imgErr) {
+            // Don't let a failed image upload block the whole post — fall back
+            // to text-only, same as if no image had been attached.
+            console.error('LinkedIn image attach failed, falling back to text-only:', imgErr)
+            media = []
+          }
+        }
+
         const res = await fetch(
           'https://api.linkedin.com/v2/ugcPosts',
           {
@@ -261,14 +344,15 @@ export async function POST(request: Request) {
               'X-Restli-Protocol-Version': '2.0.0',
             },
             body: JSON.stringify({
-              author: `urn:li:person:${account.account_id}`,
+              author: authorUrn,
               lifecycleState: 'PUBLISHED',
               specificContent: {
                 'com.linkedin.ugc.ShareContent': {
                   shareCommentary: {
                     text: plainText,
                   },
-                  shareMediaCategory: 'NONE',
+                  shareMediaCategory: media.length > 0 ? 'IMAGE' : 'NONE',
+                  ...(media.length > 0 ? { media } : {}),
                 },
               },
               visibility: {
