@@ -46,11 +46,12 @@ export default function AccountsPage() {
   }, [user, loadAccounts]);
 
   const handleConnect = (platform: 'facebook' | 'instagram' | 'linkedin') => {
-    // Each platform can only have a single connected account.
-    if (connectedPlatforms.has(platform)) return;
-
+    // Multiple accounts per platform are allowed — the OAuth callback routes
+    // already upsert on (user_id, account_id), so a second account for the
+    // same platform is saved as its own row instead of overwriting the first.
+    // We just redirect into the same OAuth flow again; whichever account the
+    // user picks/logs into on Facebook/LinkedIn's side gets added.
     if (platform === 'facebook') {
-      // Mock insert nahi — real OAuth redirect
       window.location.href = '/api/auth/facebook'
       return
     }
@@ -98,7 +99,10 @@ export default function AccountsPage() {
     'instagram',
     'linkedin',
   ];
-  const connectedPlatforms = new Set(accounts.map((a) => a.platform));
+  const accountCountByPlatform = accounts.reduce<Record<string, number>>((acc, a) => {
+    acc[a.platform] = (acc[a.platform] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <div className="min-h-screen bg-background">
@@ -134,7 +138,8 @@ export default function AccountsPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {platforms.map((platform) => {
-              const isConnected = connectedPlatforms.has(platform);
+              const count = accountCountByPlatform[platform] ?? 0;
+              const isConnected = count > 0;
               const Icon = platformMeta[platform].icon;
               return (
                 <div
@@ -151,23 +156,23 @@ export default function AccountsPage() {
                     {platformMeta[platform].label}
                   </h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    {isConnected ? 'Account connected' : 'Not connected yet'}
+                    {isConnected
+                      ? `${count} account${count === 1 ? '' : 's'} connected`
+                      : 'Not connected yet'}
                   </p>
                   <Button
-                    onClick={() =>
-                      handleConnect(platform as 'facebook' | 'instagram' | 'linkedin')
-                    }
-                    disabled={isConnected || connecting === platform || isLoading}
+                    onClick={() => handleConnect(platform)}
+                    disabled={connecting === platform || isLoading}
                     className={
                       isConnected
-                        ? 'bg-green-600 text-white opacity-80 cursor-default hover:bg-green-600'
+                        ? 'bg-primary/10 text-primary border border-primary hover:bg-primary/20'
                         : 'bg-primary hover:bg-primary/90 text-primary-foreground'
                     }
                   >
                     {connecting === platform
                       ? 'Connecting...'
                       : isConnected
-                        ? 'Connected'
+                        ? 'Add another account'
                         : 'Connect'}
                   </Button>
                 </div>
