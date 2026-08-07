@@ -11,6 +11,7 @@ import { EmojiPicker } from './EmojiPicker'
 import { HashtagSuggestions } from './HashtagSuggestions'
 import { UtmLinkBuilder } from './UtmLinkBuilder'
 import { SavedTexts } from './SavedTexts'
+import { AIPostGenerator } from './AIPostGenerator'
 
 interface RichTextEditorProps {
   content: string
@@ -25,6 +26,9 @@ interface RichTextEditorProps {
   onRemoveImage?: (url: string) => void
   isUploadingImage?: boolean
   imageHint?: string
+
+  availablePlatforms: string[]
+selectedPlatforms?: string[]
 }
 
 export function RichTextEditor({
@@ -37,6 +41,8 @@ export function RichTextEditor({
   onRemoveImage,
   isUploadingImage = false,
   imageHint,
+  availablePlatforms,
+  selectedPlatforms,
 }: RichTextEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -171,6 +177,11 @@ export function RichTextEditor({
           <HashtagSuggestions onSelect={insertAtCursor} />
           <UtmLinkBuilder onInsert={insertAtCursor} />
           <SavedTexts onInsert={insertAtCursor} />
+          <AIPostGenerator
+  onInsert={insertAtCursor}
+  availablePlatforms={availablePlatforms}
+  defaultSelected={selectedPlatforms}
+/>
 
           {onImageUpload && (
             <>

@@ -291,20 +291,19 @@ export default function ComposePage() {
                   <span className="text-sm font-medium text-foreground">Post content</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <LocationPicker value={location} onChange={setLocation} />
-                  <button
+                  {/* <LocationPicker value={location} onChange={setLocation} /> */}
+                  {/* <button
                     type="button"
                     onClick={() => setShowNotes((prev) => !prev)}
-                    className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
-                      showNotes || internalNotes
+                    className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border transition-colors ${showNotes || internalNotes
                         ? 'bg-amber-500/10 border-amber-500/30 text-amber-600'
                         : 'border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-primary'
-                    }`}
+                      }`}
                     title="Internal note (not published)"
                   >
                     <StickyNote className="w-3 h-3" />
                     Notes{internalNotes ? ' •' : ''}
-                  </button>
+                  </button> */}
                 </div>
               </div>
 
@@ -331,6 +330,8 @@ export default function ComposePage() {
                   onImageUpload={handleImageUpload}
                   onRemoveImage={handleRemoveImage}
                   isUploadingImage={isUploading}
+                  availablePlatforms={['facebook', 'instagram', 'linkedin']}
+                  selectedPlatforms={selectedPlatforms}
                   imageHint={selectedPlatforms.includes('instagram') ? 'required for Instagram' : undefined}
                 />
 
@@ -361,16 +362,14 @@ export default function ComposePage() {
                     <div
                       key={platform}
                       style={isSelected ? { boxShadow: `0 0 0 2px ${meta.ring}` } : undefined}
-                      className={`rounded-xl border transition-colors ${
-                        isSelected ? 'border-transparent' : 'border-border'
-                      }`}
+                      className={`rounded-xl border transition-colors ${isSelected ? 'border-transparent' : 'border-border'
+                        }`}
                     >
                       <button
                         type="button"
                         onClick={() => handleTogglePlatform(platform)}
-                        className={`w-full flex items-center justify-between p-4 text-left rounded-xl transition-colors ${
-                          isSelected ? 'bg-card' : 'bg-background hover:bg-muted/30'
-                        }`}
+                        className={`w-full flex items-center justify-between p-4 text-left rounded-xl transition-colors ${isSelected ? 'bg-card' : 'bg-background hover:bg-muted/30'
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <div
@@ -400,16 +399,14 @@ export default function ComposePage() {
                                     key={account.id}
                                     type="button"
                                     onClick={() => handleToggleAccount(account.id)}
-                                    className={`flex items-center gap-2 text-xs pl-1.5 pr-3 py-1.5 rounded-full border transition-colors ${
-                                      isChecked
+                                    className={`flex items-center gap-2 text-xs pl-1.5 pr-3 py-1.5 rounded-full border transition-colors ${isChecked
                                         ? 'bg-primary text-primary-foreground border-primary'
                                         : 'bg-background border-border text-muted-foreground hover:border-primary/40'
-                                    }`}
+                                      }`}
                                   >
                                     <span
-                                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold ${
-                                        isChecked ? 'bg-white/20' : 'bg-muted text-muted-foreground'
-                                      }`}
+                                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold ${isChecked ? 'bg-white/20' : 'bg-muted text-muted-foreground'
+                                        }`}
                                     >
                                       {account.accountName.slice(0, 1).toUpperCase()}
                                     </span>
