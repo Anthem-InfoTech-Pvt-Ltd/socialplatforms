@@ -26,7 +26,6 @@ interface AIPostGeneratorProps {
 
 interface Variant {
   text: string
-  platform?: string
 }
 
 const PLATFORM_META: Record<string, { label: string; icon: typeof FacebookIcon; bg: string; limit: number }> = {
@@ -47,6 +46,9 @@ const TONE_OPTIONS = [
   { value: 'inspirational', label: 'Inspirational', icon: Rocket },
 ]
 
+// Plain text (with \n\n and \n from the AI) -> HTML paragraphs/breaks so it
+// renders as multiple lines/blocks in the Tiptap editor instead of collapsing
+// into one paragraph.
 function textToHtml(text: string): string {
   return text
     .trim()
@@ -63,7 +65,6 @@ export function AIPostGenerator({ onInsert, availablePlatforms, defaultSelected 
   const [includeHashtags, setIncludeHashtags] = useState(true)
   const [includeEmoji, setIncludeEmoji] = useState(true)
   const [platforms, setPlatforms] = useState<string[]>(defaultSelected?.length ? defaultSelected : availablePlatforms)
-  const [perPlatform, setPerPlatform] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [variants, setVariants] = useState<Variant[]>([])
@@ -82,10 +83,7 @@ export function AIPostGenerator({ onInsert, availablePlatforms, defaultSelected 
       const res = await fetch('/api/ai/generate-post', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic, tone, includeHashtags, includeEmoji, platforms,
-          perPlatform: perPlatform && platforms.length > 1,
-        }),
+        body: JSON.stringify({ topic, tone, includeHashtags, includeEmoji, platforms }),
       })
       const data = await res.json()
       if (!data.success) throw new Error(data.error || 'Generation failed')
@@ -142,7 +140,7 @@ export function AIPostGenerator({ onInsert, availablePlatforms, defaultSelected 
           onClick={close}
         >
           <div
-            className="w-full max-w-3xl bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            className="w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col"
             style={{ maxHeight: '85vh' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -185,7 +183,9 @@ export function AIPostGenerator({ onInsert, availablePlatforms, defaultSelected 
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-foreground mb-1.5">Platforms</label>
+                    <label className="block text-xs font-medium text-foreground mb-1.5">
+                      Platforms — this post will go to all selected at once
+                    </label>
                     <div className="grid grid-cols-3 gap-2">
                       {availablePlatforms.map((p) => {
                         const meta = PLATFORM_META[p]
@@ -220,25 +220,6 @@ export function AIPostGenerator({ onInsert, availablePlatforms, defaultSelected 
                       })}
                     </div>
                   </div>
-
-                  {platforms.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => setPerPlatform((p) => !p)}
-                      className="w-full flex items-center gap-2.5 p-2.5 rounded-xl border border-border hover:border-primary/30 transition-colors text-left"
-                    >
-                      <div
-                        className={`w-8 h-4.5 rounded-full flex items-center px-0.5 shrink-0 transition-colors ${
-                          perPlatform ? 'bg-primary justify-end' : 'bg-muted justify-start'
-                        }`}
-                      >
-                        <div className="w-3.5 h-3.5 rounded-full bg-white shadow-sm" />
-                      </div>
-                      <span className="text-[11px] text-muted-foreground leading-tight">
-                        Tailor a separate version per platform, instead of one caption for all
-                      </span>
-                    </button>
-                  )}
 
                   <div>
                     <label className="block text-xs font-medium text-foreground mb-1.5">Tone</label>
@@ -316,10 +297,31 @@ export function AIPostGenerator({ onInsert, availablePlatforms, defaultSelected 
                     </button>
                   </div>
 
+                  {platforms.length > 1 && (
+                    <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                      Same caption will publish to:
+                      <span className="flex items-center gap-1">
+                        {platforms.map((p) => {
+                          const meta = PLATFORM_META[p]
+                          if (!meta) return null
+                          const Icon = meta.icon
+                          return (
+                            <span
+                              key={p}
+                              className="w-4 h-4 rounded flex items-center justify-center"
+                              style={{ background: meta.bg }}
+                              title={meta.label}
+                            >
+                              <Icon className="w-2.5 h-2.5 text-white" />
+                            </span>
+                          )
+                        })}
+                      </span>
+                    </p>
+                  )}
+
                   <div className="space-y-2.5">
                     {variants.map((v, i) => {
-                      const meta = v.platform ? PLATFORM_META[v.platform] : null
-                      const Icon = meta?.icon
                       const overLimit = v.text.length > strictestLimit
                       return (
                         <div
@@ -327,19 +329,7 @@ export function AIPostGenerator({ onInsert, availablePlatforms, defaultSelected 
                           className="group border border-border rounded-xl p-3.5 hover:border-primary/40 hover:bg-primary/[0.03] transition-colors"
                         >
                           <div className="flex items-center justify-between mb-2">
-                            {meta && Icon ? (
-                              <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-foreground">
-                                <span
-                                  className="w-4 h-4 rounded flex items-center justify-center"
-                                  style={{ background: meta.bg }}
-                                >
-                                  <Icon className="w-2.5 h-2.5 text-white" />
-                                </span>
-                                {meta.label}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-semibold text-muted-foreground">Variant {i + 1}</span>
-                            )}
+                            <span className="text-[10px] font-semibold text-muted-foreground">Variant {i + 1}</span>
                             <span className={`text-[10px] tabular-nums ${overLimit ? 'text-destructive font-medium' : 'text-muted-foreground/60'}`}>
                               {v.text.length.toLocaleString()} / {strictestLimit.toLocaleString()}
                             </span>
