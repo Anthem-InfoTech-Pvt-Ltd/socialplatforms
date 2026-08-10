@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'SocialHub - Social Media Management',
+  title: 'SocialHub - Social Media Dashboard',
   description: 'Manage all your social media accounts in one place',
   generator: 'v0.app',
   icons: {
