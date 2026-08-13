@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/store/AuthContext';
 import { useAccounts } from '@/store/AccountsContext';
 import { usePosts } from '@/store/PostsContext';
-import { Header } from '@/components/layout/Header';
+// import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { RichTextEditor } from '@/components/features/RichTextEditor';
 import { LocationPicker } from '@/components/features/LocationPicker';
@@ -21,6 +21,7 @@ import {
   Sparkles,
   Loader2,
 } from 'lucide-react';
+import { AppShell } from '@/components/layout/AppShell';
 
 const platformLimits: Record<string, number> = {
   facebook: 1000,
@@ -220,9 +221,9 @@ export default function ComposePage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-      </div>
+      <AppShell>
+        <div />
+      </AppShell>
     );
   }
 
@@ -235,64 +236,64 @@ export default function ComposePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <AppShell>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {/* Page header */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-              <Sparkles className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-                Create Post
-              </h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Write once, publish everywhere it matters
-              </p>
-            </div>
-          </div>
-
-          {/* Inline status pill */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-card border border-border rounded-full px-3 py-1.5 self-start sm:self-auto">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-            {accounts.length} account{accounts.length === 1 ? '' : 's'} connected
-          </div>
-        </div>
-
-        {/* Alerts */}
-        {(error || success) && (
-          <div className="mb-6">
-            {error && (
-              <div className="flex items-start gap-2.5 p-3.5 bg-destructive/10 border border-destructive/30 rounded-xl">
-                <AlertCircle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
-                <p className="text-sm text-destructive">{error}</p>
+        <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          {/* Page header */}
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5 text-primary" />
               </div>
-            )}
-            {success && (
-              <div className="flex items-start gap-2.5 p-3.5 bg-green-500/10 border border-green-500/30 rounded-xl">
-                <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
-                <p className="text-sm text-green-500">{success}</p>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+                  Create Post
+                </h1>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Write once, publish everywhere it matters
+                </p>
               </div>
-            )}
+            </div>
+
+            {/* Inline status pill */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-card border border-border rounded-full px-3 py-1.5 self-start sm:self-auto">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              {accounts.length} account{accounts.length === 1 ? '' : 's'} connected
+            </div>
           </div>
-        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Composer */}
-          <div className="lg:col-span-2 space-y-6">
-
-            {/* Composer card */}
-            <div className="bg-card border border-border rounded-2xl">
-              <div className="px-5 sm:px-6 pt-5 pb-1 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">Post content</span>
+          {/* Alerts */}
+          {(error || success) && (
+            <div className="mb-6">
+              {error && (
+                <div className="flex items-start gap-2.5 p-3.5 bg-destructive/10 border border-destructive/30 rounded-xl">
+                  <AlertCircle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+                  <p className="text-sm text-destructive">{error}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  {/* <LocationPicker value={location} onChange={setLocation} /> */}
-                  {/* <button
+              )}
+              {success && (
+                <div className="flex items-start gap-2.5 p-3.5 bg-green-500/10 border border-green-500/30 rounded-xl">
+                  <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                  <p className="text-sm text-green-500">{success}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Composer */}
+            <div className="lg:col-span-2 space-y-6">
+
+              {/* Composer card */}
+              <div className="bg-card border border-border rounded-2xl">
+                <div className="px-5 sm:px-6 pt-5 pb-1 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Post content</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {/* <LocationPicker value={location} onChange={setLocation} /> */}
+                    {/* <button
                     type="button"
                     onClick={() => setShowNotes((prev) => !prev)}
                     className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border transition-colors ${showNotes || internalNotes
@@ -304,205 +305,207 @@ export default function ComposePage() {
                     <StickyNote className="w-3 h-3" />
                     Notes{internalNotes ? ' •' : ''}
                   </button> */}
+                  </div>
+                </div>
+
+                <div className="px-5 sm:px-6 pb-6 pt-3 space-y-4">
+                  {showNotes && (
+                    <textarea
+                      value={internalNotes}
+                      onChange={(e) => setInternalNotes(e.target.value)}
+                      placeholder="Internal note for your team — never sent to Facebook, Instagram, or LinkedIn"
+                      rows={2}
+                      className="w-full text-sm px-3.5 py-2.5 border border-amber-500/30 bg-amber-500/5 rounded-xl outline-none focus:border-amber-500/60 placeholder:text-muted-foreground/50 resize-none"
+                    />
+                  )}
+
+                  <RichTextEditor
+                    content={contentHtml}
+                    onChange={(html, text) => {
+                      setContentHtml(html);
+                      setContentText(text);
+                    }}
+                    placeholder="What's on your mind? Share with your followers..."
+                    maxLength={activeLimit}
+                    mediaUrls={mediaUrls}
+                    onImageUpload={handleImageUpload}
+                    onRemoveImage={handleRemoveImage}
+                    isUploadingImage={isUploading}
+                    availablePlatforms={['facebook', 'instagram', 'linkedin']}
+                    selectedPlatforms={selectedPlatforms}
+                    imageHint={selectedPlatforms.includes('instagram') ? 'required for Instagram' : undefined}
+                  />
+
+                  {selectedPlatforms.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Limit: {activeLimit.toLocaleString()} characters
+                      {selectedPlatforms.length > 1 && ` — lowest across your selected platforms`}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <div className="px-5 sm:px-6 pb-6 pt-3 space-y-4">
-                {showNotes && (
-                  <textarea
-                    value={internalNotes}
-                    onChange={(e) => setInternalNotes(e.target.value)}
-                    placeholder="Internal note for your team — never sent to Facebook, Instagram, or LinkedIn"
-                    rows={2}
-                    className="w-full text-sm px-3.5 py-2.5 border border-amber-500/30 bg-amber-500/5 rounded-xl outline-none focus:border-amber-500/60 placeholder:text-muted-foreground/50 resize-none"
-                  />
-                )}
+              {/* Platforms + accounts, merged into one card per platform */}
+              <div className="bg-card border border-border rounded-2xl p-5 sm:p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Users2 className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">Platforms & accounts</span>
+                </div>
 
-                <RichTextEditor
-                  content={contentHtml}
-                  onChange={(html, text) => {
-                    setContentHtml(html);
-                    setContentText(text);
-                  }}
-                  placeholder="What's on your mind? Share with your followers..."
-                  maxLength={activeLimit}
-                  mediaUrls={mediaUrls}
-                  onImageUpload={handleImageUpload}
-                  onRemoveImage={handleRemoveImage}
-                  isUploadingImage={isUploading}
-                  availablePlatforms={['facebook', 'instagram', 'linkedin']}
-                  selectedPlatforms={selectedPlatforms}
-                  imageHint={selectedPlatforms.includes('instagram') ? 'required for Instagram' : undefined}
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+                  {(['linkedin', 'instagram', 'facebook'] as const).map((platform) => {
+                    const meta = platformMeta[platform];
+                    const Icon = meta.icon;
+                    const isSelected = selectedPlatforms.includes(platform);
+                    const platformAccounts = accounts.filter((a) => a.platform === platform);
 
-                {selectedPlatforms.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Limit: {activeLimit.toLocaleString()} characters
-                    {selectedPlatforms.length > 1 && ` — lowest across your selected platforms`}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Platforms + accounts, merged into one card per platform */}
-            <div className="bg-card border border-border rounded-2xl p-5 sm:p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Users2 className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">Platforms & accounts</span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
-                {(['linkedin', 'instagram', 'facebook'] as const).map((platform) => {
-                  const meta = platformMeta[platform];
-                  const Icon = meta.icon;
-                  const isSelected = selectedPlatforms.includes(platform);
-                  const platformAccounts = accounts.filter((a) => a.platform === platform);
-
-                  return (
-                    <div
-                      key={platform}
-                      style={isSelected ? { boxShadow: `0 0 0 2px ${meta.ring}` } : undefined}
-                      className={`rounded-xl border transition-colors ${isSelected ? 'border-transparent' : 'border-border'
-                        }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleTogglePlatform(platform)}
-                        className={`w-full flex items-center justify-between p-4 text-left rounded-xl transition-colors ${isSelected ? 'bg-card' : 'bg-background hover:bg-muted/30'
+                    return (
+                      <div
+                        key={platform}
+                        style={isSelected ? { boxShadow: `0 0 0 2px ${meta.ring}` } : undefined}
+                        className={`rounded-xl border transition-colors ${isSelected ? 'border-transparent' : 'border-border'
                           }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                            style={{ background: meta.bg }}
-                          >
-                            <Icon className="w-4 h-4 text-white" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-foreground">{meta.label}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {platformLimits[platform].toLocaleString()} chars
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePlatform(platform)}
+                          className={`w-full flex items-center justify-between p-4 text-left rounded-xl transition-colors ${isSelected ? 'bg-card' : 'bg-background hover:bg-muted/30'
+                            }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                              style={{ background: meta.bg }}
+                            >
+                              <Icon className="w-4 h-4 text-white" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-foreground">{meta.label}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {platformLimits[platform].toLocaleString()} chars
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        {isSelected && <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />}
-                      </button>
+                          {isSelected && <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />}
+                        </button>
 
-                      {isSelected && (
-                        <div className="px-4 pb-4 pt-1">
-                          {platformAccounts.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                              {platformAccounts.map((account) => {
-                                const isChecked = selectedAccounts.includes(account.id);
-                                return (
-                                  <button
-                                    key={account.id}
-                                    type="button"
-                                    onClick={() => handleToggleAccount(account.id)}
-                                    className={`flex items-center gap-2 text-xs pl-1.5 pr-3 py-1.5 rounded-full border transition-colors ${isChecked
+                        {isSelected && (
+                          <div className="px-4 pb-4 pt-1">
+                            {platformAccounts.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {platformAccounts.map((account) => {
+                                  const isChecked = selectedAccounts.includes(account.id);
+                                  return (
+                                    <button
+                                      key={account.id}
+                                      type="button"
+                                      onClick={() => handleToggleAccount(account.id)}
+                                      className={`flex items-center gap-2 text-xs pl-1.5 pr-3 py-1.5 rounded-full border transition-colors ${isChecked
                                         ? 'bg-primary text-primary-foreground border-primary'
                                         : 'bg-background border-border text-muted-foreground hover:border-primary/40'
-                                      }`}
-                                  >
-                                    <span
-                                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold ${isChecked ? 'bg-white/20' : 'bg-muted text-muted-foreground'
                                         }`}
                                     >
-                                      {account.accountName.slice(0, 1).toUpperCase()}
-                                    </span>
-                                    {account.accountName}
-                                    {isChecked && <CheckCircle2 className="w-3 h-3" />}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-amber-500">
-                              No account connected.{' '}
-                              <a href="/accounts" className="underline font-medium">Connect one</a>
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-3">
-              <Button
-                onClick={handleSaveDraft}
-                disabled={isPublishing || postsLoading}
-                variant="outline"
-                className="flex-1 h-11 border-primary text-primary hover:bg-primary/10"
-              >
-                Save as Draft
-              </Button>
-              <Button
-                onClick={handlePublish}
-                disabled={isPublishing || postsLoading || selectedAccounts.length === 0}
-                className="flex-1 h-11 bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
-              >
-                {isPublishing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Publishing...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    Publish Now
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Tips */}
-            <div className="bg-card border border-border rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Tips</h3>
-              <ul className="space-y-2 text-xs text-muted-foreground">
-                <li className="flex gap-2"><span className="text-primary">•</span>Keep posts concise and engaging</li>
-                <li className="flex gap-2"><span className="text-primary">•</span>Use relevant hashtags</li>
-                <li className="flex gap-2"><span className="text-primary">•</span>Bold key points for emphasis</li>
-                <li className="flex gap-2"><span className="text-primary">•</span>Images boost engagement 3x</li>
-                <li className="flex gap-2"><span className="text-primary">•</span>Schedule for optimal timing</li>
-              </ul>
-            </div>
-
-            {/* Connected Accounts */}
-            <div className="bg-card border border-border rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Connected accounts</h3>
-              {accounts.length > 0 ? (
-                <div className="space-y-2.5">
-                  {accounts.map((account) => {
-                    const Icon = platformMeta[account.platform]?.icon;
-                    return (
-                      <div key={account.id} className="flex items-center gap-2.5">
-                        <div
-                          className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-                          style={{ background: platformMeta[account.platform]?.bg }}
-                        >
-                          {Icon && <Icon className="w-3 h-3 text-white" />}
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {account.accountName}
-                        </span>
+                                      <span
+                                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold ${isChecked ? 'bg-white/20' : 'bg-muted text-muted-foreground'
+                                          }`}
+                                      >
+                                        {account.accountName.slice(0, 1).toUpperCase()}
+                                      </span>
+                                      {account.accountName}
+                                      {isChecked && <CheckCircle2 className="w-3 h-3" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-amber-500">
+                                No account connected.{' '}
+                                <a href="/accounts" className="underline font-medium">Connect one</a>
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">No accounts connected</p>
-              )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleSaveDraft}
+                  disabled={isPublishing || postsLoading}
+                  variant="outline"
+                  className="flex-1 h-11 border-primary text-primary hover:bg-primary/10"
+                >
+                  Save as Draft
+                </Button>
+                <Button
+                  onClick={handlePublish}
+                  disabled={isPublishing || postsLoading || selectedAccounts.length === 0}
+                  className="flex-1 h-11 bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+                >
+                  {isPublishing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Publishing...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      Publish Now
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Tips */}
+              <div className="bg-card border border-border rounded-2xl p-5">
+                <h3 className="text-sm font-semibold text-foreground mb-3">Tips</h3>
+                <ul className="space-y-2 text-xs text-muted-foreground">
+                  <li className="flex gap-2"><span className="text-primary">•</span>Keep posts concise and engaging</li>
+                  <li className="flex gap-2"><span className="text-primary">•</span>Use relevant hashtags</li>
+                  <li className="flex gap-2"><span className="text-primary">•</span>Bold key points for emphasis</li>
+                  <li className="flex gap-2"><span className="text-primary">•</span>Images boost engagement 3x</li>
+                  <li className="flex gap-2"><span className="text-primary">•</span>Schedule for optimal timing</li>
+                </ul>
+              </div>
+
+              {/* Connected Accounts */}
+              <div className="bg-card border border-border rounded-2xl p-5">
+                <h3 className="text-sm font-semibold text-foreground mb-3">Connected accounts</h3>
+                {accounts.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {accounts.map((account) => {
+                      const Icon = platformMeta[account.platform]?.icon;
+                      return (
+                        <div key={account.id} className="flex items-center gap-2.5">
+                          <div
+                            className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+                            style={{ background: platformMeta[account.platform]?.bg }}
+                          >
+                            {Icon && <Icon className="w-3 h-3 text-white" />}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {account.accountName}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No accounts connected</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </main>
+        </main>
+
+      </AppShell>
     </div>
   );
 }

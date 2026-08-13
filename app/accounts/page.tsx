@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/store/AuthContext';
 import { useAccounts } from '@/store/AccountsContext';
-import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { SocialAccount } from '@/types';
 import { LinkedinIcon, InstagramIcon, FacebookIcon } from '@/components/features/SocialIcons';
+import { AppShell } from '@/components/layout/AppShell';
 
 const platformMeta: Record<string, { label: string; icon: typeof LinkedinIcon; bg: string }> = {
   facebook: { label: 'Facebook', icon: FacebookIcon, bg: '#1877F2' },
@@ -84,9 +84,9 @@ export default function AccountsPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-      </div>
+      <AppShell>
+        <div />
+      </AppShell>
     );
   }
 
@@ -106,148 +106,150 @@ export default function AccountsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <AppShell>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Social Accounts
-          </h1>
-          <p className="text-muted-foreground">
-            Connect and manage your social media accounts
-          </p>
-        </div>
-
-        {/* Alerts */}
-        {error && (
-          <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
-            <p className="text-sm text-destructive">{error}</p>
+        <main className=" mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              Social Accounts
+            </h1>
+            <p className="text-muted-foreground">
+              Connect and manage your social media accounts
+            </p>
           </div>
-        )}
 
-        {success && (
-          <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
-            <p className="text-sm text-green-500">{success}</p>
-          </div>
-        )}
+          {/* Alerts */}
+          {error && (
+            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
 
-        {/* Available Platforms */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold text-foreground mb-4">
-            Connect a Platform
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {platforms.map((platform) => {
-              const count = accountCountByPlatform[platform] ?? 0;
-              const isConnected = count > 0;
-              const Icon = platformMeta[platform].icon;
-              return (
-                <div
-                  key={platform}
-                  className="bg-card border border-border rounded-lg p-6 flex flex-col items-center text-center"
-                >
-                  <div
-                    className="w-16 h-16 rounded-lg flex items-center justify-center mb-4"
-                    style={{ background: platformMeta[platform].bg }}
-                  >
-                    <Icon className="w-7 h-7 text-white" />
-                  </div>
-                  <h3 className="font-semibold text-foreground capitalize mb-2">
-                    {platformMeta[platform].label}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {isConnected
-                      ? `${count} account${count === 1 ? '' : 's'} connected`
-                      : 'Not connected yet'}
-                  </p>
-                  <Button
-                    onClick={() => handleConnect(platform)}
-                    disabled={connecting === platform || isLoading}
-                    className={
-                      isConnected
-                        ? 'bg-primary/10 text-primary border border-primary hover:bg-primary/20'
-                        : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                    }
-                  >
-                    {connecting === platform
-                      ? 'Connecting...'
-                      : isConnected
-                        ? 'Add another account'
-                        : 'Connect'}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+          {success && (
+            <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+              <p className="text-sm text-green-500">{success}</p>
+            </div>
+          )}
 
-        {/* Connected Accounts */}
-        <div>
-          <h2 className="text-xl font-bold text-foreground mb-4">
-            Connected Accounts
-          </h2>
-          {accounts.length > 0 ? (
-            <div className="space-y-4">
-              {accounts.map((account) => {
-                const Icon = platformMeta[account.platform]?.icon;
+          {/* Available Platforms */}
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-foreground mb-4">
+              Connect a Platform
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {platforms.map((platform) => {
+                const count = accountCountByPlatform[platform] ?? 0;
+                const isConnected = count > 0;
+                const Icon = platformMeta[platform].icon;
                 return (
                   <div
-                    key={account.id}
-                    className="bg-card border border-border rounded-lg p-6 flex items-center justify-between"
+                    key={platform}
+                    className="bg-card border border-border rounded-lg p-6 flex flex-col items-center text-center"
                   >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
-                        style={{
-                          background: Icon
-                            ? platformMeta[account.platform]?.bg
-                            : undefined,
-                        }}
-                      >
-                        {Icon && <Icon className="w-5 h-5 text-white" />}
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-foreground">
-                          {account.accountName}
-                        </h3>
-                        <p className="text-sm text-muted-foreground capitalize">
-                          {platformMeta[account.platform]?.label ?? account.platform}
-                        </p>
-                        <p className="text-xs text-green-500 mt-1">✓ Connected</p>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => handleDisconnect(account.id)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:bg-destructive/10"
+                    <div
+                      className="w-16 h-16 rounded-lg flex items-center justify-center mb-4"
+                      style={{ background: platformMeta[platform].bg }}
                     >
-                      Disconnect
+                      <Icon className="w-7 h-7 text-white" />
+                    </div>
+                    <h3 className="font-semibold text-foreground capitalize mb-2">
+                      {platformMeta[platform].label}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {isConnected
+                        ? `${count} account${count === 1 ? '' : 's'} connected`
+                        : 'Not connected yet'}
+                    </p>
+                    <Button
+                      onClick={() => handleConnect(platform)}
+                      disabled={connecting === platform || isLoading}
+                      className={
+                        isConnected
+                          ? 'bg-primary/10 text-primary border border-primary hover:bg-primary/20'
+                          : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                      }
+                    >
+                      {connecting === platform
+                        ? 'Connecting...'
+                        : isConnected
+                          ? 'Add another account'
+                          : 'Connect'}
                     </Button>
                   </div>
                 );
               })}
             </div>
-          ) : (
-            <div className="bg-card border border-border rounded-lg p-8 text-center">
-              <p className="text-muted-foreground mb-4">
-                No accounts connected yet. Connect a platform above to get started.
-              </p>
-            </div>
-          )}
-        </div>
+          </div>
 
-        {/* Info Section */}
-        <div className="mt-8 bg-card border border-border rounded-lg p-6">
-          <h3 className="font-semibold text-foreground mb-4">Why Connect Accounts?</h3>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li>✓ Publish to multiple platforms at once</li>
-            <li>✓ Track engagement across all accounts</li>
-            <li>✓ Schedule posts in advance</li>
-            <li>✓ Centralize your social media management</li>
-          </ul>
-        </div>
-      </main>
+          {/* Connected Accounts */}
+          <div>
+            <h2 className="text-xl font-bold text-foreground mb-4">
+              Connected Accounts
+            </h2>
+            {accounts.length > 0 ? (
+              <div className="space-y-4">
+                {accounts.map((account) => {
+                  const Icon = platformMeta[account.platform]?.icon;
+                  return (
+                    <div
+                      key={account.id}
+                      className="bg-card border border-border rounded-lg p-6 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div
+                          className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
+                          style={{
+                            background: Icon
+                              ? platformMeta[account.platform]?.bg
+                              : undefined,
+                          }}
+                        >
+                          {Icon && <Icon className="w-5 h-5 text-white" />}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-foreground">
+                            {account.accountName}
+                          </h3>
+                          <p className="text-sm text-muted-foreground capitalize">
+                            {platformMeta[account.platform]?.label ?? account.platform}
+                          </p>
+                          <p className="text-xs text-green-500 mt-1">✓ Connected</p>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => handleDisconnect(account.id)}
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:bg-destructive/10"
+                      >
+                        Disconnect
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-card border border-border rounded-lg p-8 text-center">
+                <p className="text-muted-foreground mb-4">
+                  No accounts connected yet. Connect a platform above to get started.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Info Section */}
+          <div className="mt-8 bg-card border border-border rounded-lg p-6">
+            <h3 className="font-semibold text-foreground mb-4">Why Connect Accounts?</h3>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>✓ Publish to multiple platforms at once</li>
+              <li>✓ Track engagement across all accounts</li>
+              <li>✓ Schedule posts in advance</li>
+              <li>✓ Centralize your social media management</li>
+            </ul>
+          </div>
+        </main>
+
+      </AppShell>
     </div>
   );
 }
