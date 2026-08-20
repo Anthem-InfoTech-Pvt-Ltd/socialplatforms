@@ -125,9 +125,8 @@ export default function ComposePage() {
     );
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
+  const handleImageSelected = async (file: File) => {
+    if (!user) return;
 
     if (!file.type.startsWith('image/')) {
       setError('Please select an image file');
@@ -145,6 +144,21 @@ export default function ComposePage() {
       setMediaUrls((prev) => [...prev, url]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload image');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleImageEdited = async (sourceUrl: string, file: File) => {
+    if (!user) return;
+
+    try {
+      setIsUploading(true);
+      setError('');
+      const newUrl = await uploadPostImage(file, user.id);
+      setMediaUrls((prev) => prev.map((u) => (u === sourceUrl ? newUrl : u)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save edited image');
     } finally {
       setIsUploading(false);
     }
@@ -328,7 +342,8 @@ export default function ComposePage() {
                     placeholder="What's on your mind? Share with your followers..."
                     maxLength={activeLimit}
                     mediaUrls={mediaUrls}
-                    onImageUpload={handleImageUpload}
+                    onImageUpload={handleImageSelected}
+                    onEditImage={handleImageEdited}
                     onRemoveImage={handleRemoveImage}
                     isUploadingImage={isUploading}
                     availablePlatforms={['facebook', 'instagram', 'linkedin']}

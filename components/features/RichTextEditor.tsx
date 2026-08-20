@@ -1,17 +1,18 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import CharacterCount from '@tiptap/extension-character-count'
 import Link from '@tiptap/extension-link'
-import { Eraser, ImagePlus, Loader2, X } from 'lucide-react'
+import { Eraser, ImagePlus, Loader2, Pencil, X } from 'lucide-react'
 import { EmojiPicker } from './EmojiPicker'
 import { HashtagSuggestions } from './HashtagSuggestions'
 import { UtmLinkBuilder } from './UtmLinkBuilder'
 import { SavedTexts } from './SavedTexts'
 import { AIPostGenerator } from './AIPostGenerator'
+import { ImageEditorModal } from './ImageEditorModal'
 
 interface RichTextEditorProps {
   content: string
@@ -19,16 +20,17 @@ interface RichTextEditorProps {
   placeholder?: string
   maxLength?: number
   // Image attachment — lives in the same toolbar row as emoji/hashtag/link/saved texts.
-  // Upload logic (validation, Supabase call, setMediaUrls) stays in the parent; this
-  // component just triggers the file picker and renders the toolbar icon + thumbnails.
+  // A file picked here always goes through the edit popup (crop/resize) first;
+  // upload logic (the actual Supabase call, setMediaUrls) stays in the parent.
   mediaUrls?: string[]
-  onImageUpload?: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onImageUpload?: (file: File) => void
+  onEditImage?: (sourceUrl: string, file: File) => void
   onRemoveImage?: (url: string) => void
   isUploadingImage?: boolean
   imageHint?: string
 
   availablePlatforms: string[]
-selectedPlatforms?: string[]
+  selectedPlatforms?: string[]
 }
 
 export function RichTextEditor({
@@ -38,6 +40,7 @@ export function RichTextEditor({
   maxLength = 3000,
   mediaUrls = [],
   onImageUpload,
+  onEditImage,
   onRemoveImage,
   isUploadingImage = false,
   imageHint,
@@ -45,6 +48,13 @@ export function RichTextEditor({
   selectedPlatforms,
 }: RichTextEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Image editor popup state. editingSourceUrl is set when re-editing an
+  // already-uploaded image (from the thumbnail's edit button) so save can
+  // tell the parent which url to replace vs. which file to upload as new.
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [editingSourceUrl, setEditingSourceUrl] = useState<string | null>(null)
 
   const editor = useEditor({
     extensions: [
@@ -63,9 +73,6 @@ export function RichTextEditor({
       }),
       Placeholder.configure({ placeholder }),
       CharacterCount.configure({ limit: maxLength }),
-      // Lets the "Insert link" tool show custom display text instead of the raw
-      // URL, and makes it clickable (opens in a new tab) both while editing
-      // and wherever this HTML is rendered (e.g. the Preview panel).
       Link.configure({
         openOnClick: true,
         autolink: true,
@@ -90,15 +97,46 @@ export function RichTextEditor({
   const isNearLimit = percentage > 80
   const isAtLimit = percentage >= 100
 
-  // Circular progress geometry
   const radius = 9
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference - (Math.min(percentage, 100) / 100) * circumference
 
-  // Insert plain text (or a small HTML fragment, e.g. a link) at the current
-  // cursor position, then refocus the editor.
   const insertAtCursor = (content: string) => {
     editor.chain().focus().insertContent(content).run()
+  }
+
+  // New file picked from disk — open the editor before it ever reaches the parent.
+  const handleFileSelected = (file: File) => {
+    setEditingSourceUrl(null)
+    setPendingFile(file)
+    setEditorOpen(true)
+  }
+
+  // Re-edit an already-uploaded image: pull its bytes back into a File so the
+  // same crop/resize UI works, and remember its url for the replace step.
+  const handleEditExisting = async (url: string) => {
+    try {
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const file = new File([blob], 'image.jpg', { type: blob.type || 'image/jpeg' })
+      setEditingSourceUrl(url)
+      setPendingFile(file)
+      setEditorOpen(true)
+    } catch (err) {
+      console.error('Could not load image for editing:', err)
+    }
+  }
+
+  const handleEditorSave = (blob: Blob, fileName: string) => {
+    const file = new File([blob], fileName, { type: blob.type })
+    if (editingSourceUrl) {
+      onEditImage?.(editingSourceUrl, file)
+    } else {
+      onImageUpload?.(file)
+    }
+    setEditorOpen(false)
+    setPendingFile(null)
+    setEditingSourceUrl(null)
   }
 
   return (
@@ -131,7 +169,7 @@ export function RichTextEditor({
         "
       />
 
-      {/* Attached image thumbnails — shown inside the editor, right above the toolbar */}
+      {/* Attached image thumbnails */}
       {mediaUrls.length > 0 && (
         <div
           className="flex flex-wrap gap-2 px-4 pb-3 pt-1 border-t border-border/60"
@@ -140,15 +178,28 @@ export function RichTextEditor({
           {mediaUrls.map((url) => (
             <div key={url} className="group relative w-14 h-14 rounded-lg overflow-hidden border border-border shrink-0">
               <img src={url} alt="attached" className="w-full h-full object-cover" />
-              {onRemoveImage && (
-                <button
-                  type="button"
-                  onClick={() => onRemoveImage(url)}
-                  className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X className="w-2.5 h-2.5" />
-                </button>
-              )}
+              <div className="absolute top-0.5 right-0.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                {onEditImage && (
+                  <button
+                    type="button"
+                    onClick={() => handleEditExisting(url)}
+                    className="bg-black/70 text-white rounded-full w-4 h-4 flex items-center justify-center"
+                    title="Edit image"
+                  >
+                    <Pencil className="w-2.5 h-2.5" />
+                  </button>
+                )}
+                {onRemoveImage && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveImage(url)}
+                    className="bg-black/70 text-white rounded-full w-4 h-4 flex items-center justify-center"
+                    title="Remove image"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -178,10 +229,10 @@ export function RichTextEditor({
           <UtmLinkBuilder onInsert={insertAtCursor} />
           <SavedTexts onInsert={insertAtCursor} />
           <AIPostGenerator
-  onInsert={insertAtCursor}
-  availablePlatforms={availablePlatforms}
-  defaultSelected={selectedPlatforms}
-/>
+            onInsert={insertAtCursor}
+            availablePlatforms={availablePlatforms}
+            defaultSelected={selectedPlatforms}
+          />
 
           {onImageUpload && (
             <>
@@ -203,7 +254,8 @@ export function RichTextEditor({
                 type="file"
                 accept="image/*"
                 onChange={(e) => {
-                  onImageUpload(e)
+                  const file = e.target.files?.[0]
+                  if (file) handleFileSelected(file)
                   if (fileInputRef.current) fileInputRef.current.value = ''
                 }}
                 className="hidden"
@@ -225,7 +277,6 @@ export function RichTextEditor({
             </span>
           )}
 
-          {/* Circular progress ring */}
           <div className="relative w-6 h-6 shrink-0">
             <svg className="w-6 h-6 -rotate-90" viewBox="0 0 24 24">
               <circle
@@ -259,6 +310,18 @@ export function RichTextEditor({
           </span>
         </div>
       </div>
+
+      <ImageEditorModal
+        open={editorOpen}
+        imageFile={pendingFile}
+        availablePlatforms={selectedPlatforms?.length ? selectedPlatforms : availablePlatforms}
+        onClose={() => {
+          setEditorOpen(false)
+          setPendingFile(null)
+          setEditingSourceUrl(null)
+        }}
+        onSave={handleEditorSave}
+      />
     </div>
   )
 }
