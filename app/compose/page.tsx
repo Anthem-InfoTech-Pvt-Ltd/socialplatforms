@@ -342,8 +342,12 @@ export default function ComposePage() {
                     placeholder="What's on your mind? Share with your followers..."
                     maxLength={activeLimit}
                     mediaUrls={mediaUrls}
+<<<<<<< HEAD
                     onImageUpload={handleImageSelected}
                     onEditImage={handleImageEdited}
+=======
+                    onImageUpload={handleImageUpload}
+>>>>>>> 03043725727948d05cca380749a36710313865d5
                     onRemoveImage={handleRemoveImage}
                     isUploadingImage={isUploading}
                     availablePlatforms={['facebook', 'instagram', 'linkedin']}
