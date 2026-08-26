@@ -13,6 +13,8 @@ export async function GET() {
     response_type: 'code',
   })
 
+  console.log('THREADS AUTHORIZE URL:', `https://threads.net/oauth/authorize?${params}`)
+
   return Response.redirect(
     `https://threads.net/oauth/authorize?${params}`
   )
