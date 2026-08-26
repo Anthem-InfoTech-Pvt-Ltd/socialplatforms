@@ -20,13 +20,21 @@ import {
   Users2,
   Sparkles,
   Loader2,
+  AtSign,
+  MapPin,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
+
+// TODO: swap AtSign/MapPin for proper brand icons once added to SocialIcons —
+// these lucide icons are just placeholders so the two new platforms render
+// something reasonable without blocking on icon work.
 
 const platformLimits: Record<string, number> = {
   facebook: 1000,
   instagram: 1000,
   linkedin: 1000,
+  threads: 500,
+  google_business: 1500,
 }
 
 const platformMeta: Record<string, { label: string; icon: typeof LinkedinIcon; bg: string; ring: string }> = {
@@ -38,7 +46,11 @@ const platformMeta: Record<string, { label: string; icon: typeof LinkedinIcon; b
     ring: 'rgba(214,36,159,0.35)',
   },
   linkedin: { label: 'LinkedIn', icon: LinkedinIcon, bg: '#0A66C2', ring: 'rgba(10,102,194,0.35)' },
+  threads: { label: 'Threads', icon: AtSign, bg: '#000000', ring: 'rgba(0,0,0,0.35)' },
+  google_business: { label: 'Google Business', icon: MapPin, bg: '#1A73E8', ring: 'rgba(26,115,232,0.35)' },
 }
+
+const ALL_PLATFORMS = ['linkedin', 'instagram', 'facebook', 'threads', 'google_business'] as const;
 
 export default function ComposePage() {
   const router = useRouter();
@@ -327,7 +339,7 @@ export default function ComposePage() {
                     <textarea
                       value={internalNotes}
                       onChange={(e) => setInternalNotes(e.target.value)}
-                      placeholder="Internal note for your team — never sent to Facebook, Instagram, or LinkedIn"
+                      placeholder="Internal note for your team — never sent to Facebook, Instagram, LinkedIn, Threads, or Google Business"
                       rows={2}
                       className="w-full text-sm px-3.5 py-2.5 border border-amber-500/30 bg-amber-500/5 rounded-xl outline-none focus:border-amber-500/60 placeholder:text-muted-foreground/50 resize-none"
                     />
@@ -346,7 +358,7 @@ export default function ComposePage() {
                     onEditImage={handleImageEdited}
                     onRemoveImage={handleRemoveImage}
                     isUploadingImage={isUploading}
-                    availablePlatforms={['facebook', 'instagram', 'linkedin']}
+                    availablePlatforms={[...ALL_PLATFORMS]}
                     selectedPlatforms={selectedPlatforms}
                     imageHint={selectedPlatforms.includes('instagram') ? 'required for Instagram' : undefined}
                   />
@@ -368,7 +380,7 @@ export default function ComposePage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
-                  {(['linkedin', 'instagram', 'facebook'] as const).map((platform) => {
+                  {ALL_PLATFORMS.map((platform) => {
                     const meta = platformMeta[platform];
                     const Icon = meta.icon;
                     const isSelected = selectedPlatforms.includes(platform);

@@ -7,6 +7,10 @@ import { useAccounts } from '@/store/AccountsContext';
 import { Button } from '@/components/ui/button';
 import { SocialAccount } from '@/types';
 import { LinkedinIcon, InstagramIcon, FacebookIcon } from '@/components/features/SocialIcons';
+// TODO: replace these two with dedicated brand SVGs in SocialIcons.tsx
+// (same shape as LinkedinIcon/InstagramIcon/FacebookIcon) once you have them —
+// AtSign/Building2 from lucide-react are just placeholders for now.
+import { AtSign, Building2 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 
 const platformMeta: Record<string, { label: string; icon: typeof LinkedinIcon; bg: string }> = {
@@ -17,6 +21,8 @@ const platformMeta: Record<string, { label: string; icon: typeof LinkedinIcon; b
     bg: 'radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%)',
   },
   linkedin: { label: 'LinkedIn', icon: LinkedinIcon, bg: '#0A66C2' },
+  threads: { label: 'Threads', icon: AtSign, bg: '#000000' },
+  google_business: { label: 'Google Business Profile', icon: Building2, bg: '#4285F4' },
 }
 
 export default function AccountsPage() {
@@ -45,12 +51,15 @@ export default function AccountsPage() {
     }
   }, [user, loadAccounts]);
 
-  const handleConnect = (platform: 'facebook' | 'instagram' | 'linkedin') => {
+  const handleConnect = (
+    platform: 'facebook' | 'instagram' | 'linkedin' | 'threads' | 'google_business'
+  ) => {
     // Multiple accounts per platform are allowed — the OAuth callback routes
     // already upsert on (user_id, account_id), so a second account for the
     // same platform is saved as its own row instead of overwriting the first.
     // We just redirect into the same OAuth flow again; whichever account the
-    // user picks/logs into on Facebook/LinkedIn's side gets added.
+    // user picks/logs into on the provider's side gets added.
+    setConnecting(platform);
     if (platform === 'facebook') {
       window.location.href = '/api/auth/facebook'
       return
@@ -61,6 +70,14 @@ export default function AccountsPage() {
     }
     if (platform === 'instagram') {
       window.location.href = '/api/auth/instagram'
+      return
+    }
+    if (platform === 'threads') {
+      window.location.href = '/api/auth/threads'
+      return
+    }
+    if (platform === 'google_business') {
+      window.location.href = '/api/auth/google-business'
       return
     }
   }
@@ -94,10 +111,12 @@ export default function AccountsPage() {
     return null;
   }
 
-  const platforms: Array<'facebook' | 'instagram' | 'linkedin'> = [
+  const platforms: Array<'facebook' | 'instagram' | 'linkedin' | 'threads' | 'google_business'> = [
     'facebook',
     'instagram',
     'linkedin',
+    'threads',
+    'google_business',
   ];
   const accountCountByPlatform = accounts.reduce<Record<string, number>>((acc, a) => {
     acc[a.platform] = (acc[a.platform] ?? 0) + 1;

@@ -2,13 +2,15 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 const INSTAGRAM_CAPTION_LIMIT = 2200
+const THREADS_CAPTION_LIMIT = 500
+const GOOGLE_BUSINESS_SUMMARY_LIMIT = 1500
 
 // Helper function — Convert HTML to plain text
 function htmlToPlainText(html: string): string {
   return html
     // Links inserted via the "Insert link" tool show custom display text in the
-    // editor, but FB/IG/LinkedIn captions are plain text — so keep both the
-    // text and the actual URL, or the link would silently vanish on publish.
+    // editor, but FB/IG/LinkedIn/Threads/GBP captions are plain text — so keep both
+    // the text and the actual URL, or the link would silently vanish on publish.
     .replace(/<a[^>]+href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi, (_, href, text) =>
       text.trim() === href.trim() ? href : `${text} (${href})`
     )
@@ -37,7 +39,56 @@ function extractImageUrls(html: string): string[] {
   const matches = html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)
   return [...matches]
     .map(match => match[1])
-    .filter(url => url.startsWith('http')) // data: URLs (base64) can't be used by FB/IG/LinkedIn APIs — they need a public URL
+    .filter(url => url.startsWith('http')) // data: URLs (base64) can't be used by any of these APIs — they need a public URL
+}
+
+// Truncate a caption to a platform limit, adding an ellipsis, and warn in the
+// server logs so a silent truncation doesn't go unnoticed.
+function truncateCaption(text: string, limit: number, platform: string): string {
+  if (text.length <= limit) return text
+  console.warn(`${platform} caption too long (${text.length} chars) — truncating to ${limit}`)
+  return text.slice(0, limit - 1) + '…'
+}
+
+// Google's access tokens only last ~1 hour, unlike Meta's ~60-day tokens.
+// Refresh from the stored refresh_token whenever the stored expiry is past
+// (or close to it), and write the new token back so the next publish reuses it.
+async function getFreshGoogleAccessToken(supabase: any, account: any): Promise<string> {
+  const expiresAt = account.token_expires_at ? new Date(account.token_expires_at).getTime() : 0
+  const isExpiringSoon = expiresAt - Date.now() < 5 * 60 * 1000 // refresh 5 min early
+
+  if (!isExpiringSoon) {
+    return account.access_token
+  }
+
+  if (!account.refresh_token) {
+    throw new Error('Google Business token expired and no refresh_token is stored — reconnect the account')
+  }
+
+  const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      refresh_token: account.refresh_token,
+      grant_type: 'refresh_token',
+    }),
+  })
+  const refreshData = await refreshRes.json()
+
+  if (!refreshRes.ok || refreshData.error || !refreshData.access_token) {
+    throw new Error(refreshData.error_description || 'Google Business token refresh failed')
+  }
+
+  const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
+
+  await supabase
+    .from('social_accounts')
+    .update({ access_token: refreshData.access_token, token_expires_at: newExpiresAt })
+    .eq('id', account.id)
+
+  return refreshData.access_token
 }
 
 export async function POST(request: Request) {
@@ -175,13 +226,7 @@ export async function POST(request: Request) {
         // this, so a long post can silently succeed on FB but fail on IG's container
         // creation step. Trim it here so the request never gets rejected for length,
         // and log a warning so we know it happened.
-        let igCaption = plainText
-        if (igCaption.length > INSTAGRAM_CAPTION_LIMIT) {
-          console.warn(
-            `Instagram caption too long (${igCaption.length} chars) — truncating to ${INSTAGRAM_CAPTION_LIMIT}`
-          )
-          igCaption = igCaption.slice(0, INSTAGRAM_CAPTION_LIMIT - 1) + '…'
-        }
+        const igCaption = truncateCaption(plainText, INSTAGRAM_CAPTION_LIMIT, 'Instagram')
 
         // Step 1: create a media container
         const containerRes = await fetch(
@@ -245,6 +290,134 @@ export async function POST(request: Request) {
         }
 
         platformPostId = publishData.id
+      }
+
+      // ==========================
+      // THREADS
+      // ==========================
+      if (account.platform === 'threads') {
+        // Threads supports text-only posts (unlike Instagram), so no image
+        // requirement here. Same container → publish two-step pattern as IG.
+        const threadsCaption = truncateCaption(plainText, THREADS_CAPTION_LIMIT, 'Threads')
+
+        const containerBody: Record<string, string> = {
+          media_type: imageUrls.length > 0 ? 'IMAGE' : 'TEXT',
+          text: threadsCaption,
+          access_token: account.access_token,
+        }
+        if (imageUrls.length > 0) {
+          containerBody.image_url = imageUrls[0]
+        }
+
+        const containerRes = await fetch(
+          `https://graph.threads.net/v1.0/${account.account_id}/threads`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(containerBody),
+          }
+        )
+
+        const containerData = await containerRes.json()
+
+        console.log(
+          'Threads container result:',
+          JSON.stringify(containerData, null, 2)
+        )
+
+        if (!containerRes.ok || containerData.error) {
+          throw new Error(
+            containerData.error?.message || 'Threads container creation failed'
+          )
+        }
+
+        // Publish step happens moments after container creation. Threads
+        // occasionally still has the container in IN_PROGRESS status right
+        // after creation — a short delay avoids a spurious failure on
+        // larger images. Text-only posts don't need this.
+        if (imageUrls.length > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 2000))
+        }
+
+        const publishRes = await fetch(
+          `https://graph.threads.net/v1.0/${account.account_id}/threads_publish`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              creation_id: containerData.id,
+              access_token: account.access_token,
+            }),
+          }
+        )
+
+        const publishData = await publishRes.json()
+
+        console.log(
+          'Threads publish result:',
+          JSON.stringify(publishData, null, 2)
+        )
+
+        if (!publishRes.ok || publishData.error) {
+          throw new Error(
+            publishData.error?.message || 'Threads publish failed'
+          )
+        }
+
+        platformPostId = publishData.id
+      }
+
+      // ==========================
+      // GOOGLE BUSINESS PROFILE
+      // ==========================
+      if (account.platform === 'google_business') {
+        // Google's access token is short-lived (~1hr) — refresh first if needed.
+        const freshToken = await getFreshGoogleAccessToken(supabase, account)
+
+        const gbpSummary = truncateCaption(plainText, GOOGLE_BUSINESS_SUMMARY_LIMIT, 'Google Business')
+
+        const localPostBody: Record<string, any> = {
+          languageCode: 'en-US',
+          summary: gbpSummary,
+          topicType: 'STANDARD',
+        }
+
+        // GBP local posts accept exactly one photo (jpg/png, under 5MB,
+        // minimum 400x300) — unlike FB/Threads there's no multi-image support here.
+        if (imageUrls.length > 0) {
+          localPostBody.media = [
+            { mediaFormat: 'PHOTO', sourceUrl: imageUrls[0] },
+          ]
+        }
+
+        // account.account_id is the full resource path stored at connect
+        // time: accounts/{accountId}/locations/{locationId}
+        const res = await fetch(
+          `https://mybusiness.googleapis.com/v4/${account.account_id}/localPosts`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${freshToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(localPostBody),
+          }
+        )
+
+        const data = await res.json()
+
+        console.log(
+          'Google Business post result:',
+          JSON.stringify(data, null, 2)
+        )
+
+        if (!res.ok || data.error) {
+          throw new Error(
+            data.error?.message || 'Google Business publish failed'
+          )
+        }
+
+        platformPostId = data.name
       }
 
       // ==========================
