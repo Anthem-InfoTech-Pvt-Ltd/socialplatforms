@@ -9,8 +9,8 @@ const GOOGLE_BUSINESS_SUMMARY_LIMIT = 1500
 function htmlToPlainText(html: string): string {
   return html
     // Links inserted via the "Insert link" tool show custom display text in the
-    // editor, but FB/IG/LinkedIn/Threads/GBP captions are plain text — so keep both
-    // the text and the actual URL, or the link would silently vanish on publish.
+    // editor, but FB/IG/LinkedIn/Threads/GBP/Chat captions are plain text — so keep
+    // both the text and the actual URL, or the link would silently vanish on publish.
     .replace(/<a[^>]+href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi, (_, href, text) =>
       text.trim() === href.trim() ? href : `${text} (${href})`
     )
@@ -418,6 +418,63 @@ export async function POST(request: Request) {
         }
 
         platformPostId = data.name
+      }
+
+      // ==========================
+      // GOOGLE CHAT
+      // ==========================
+      if (account.platform === 'google_chat') {
+        // Google Chat has no "post" concept like the others — it's a simple
+        // incoming-webhook message. account.access_token holds the webhook
+        // URL that was saved when the user connected this "account".
+        if (!account.access_token) {
+          throw new Error('Google Chat webhook URL is missing — reconnect this space')
+        }
+
+        // Plain "text" messages don't auto-unfurl links into an image the
+        // way some other chat apps do — Google Chat only renders an actual
+        // image when it's sent as a Cards v2 widget. Build a card when an
+        // image is present; fall back to a plain text message otherwise.
+        const chatBody: Record<string, any> = imageUrls.length > 0
+          ? {
+              cardsV2: [
+                {
+                  cardId: 'social-post',
+                  card: {
+                    sections: [
+                      {
+                        widgets: [
+                          { textParagraph: { text: plainText.replace(/\n/g, '<br>') } },
+                          { image: { imageUrl: imageUrls[0] } },
+                        ],
+                      },
+                    ],
+                  },
+                },
+              ],
+            }
+          : { text: plainText }
+
+        const res = await fetch(account.access_token, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(chatBody),
+        })
+
+        const data = await res.json()
+
+        console.log(
+          'Google Chat message result:',
+          JSON.stringify(data, null, 2)
+        )
+
+        if (!res.ok || data.error) {
+          throw new Error(
+            data.error?.message || 'Google Chat message failed'
+          )
+        }
+
+        platformPostId = data.name || null
       }
 
       // ==========================

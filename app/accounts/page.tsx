@@ -7,10 +7,9 @@ import { useAccounts } from '@/store/AccountsContext';
 import { Button } from '@/components/ui/button';
 import { SocialAccount } from '@/types';
 import { LinkedinIcon, InstagramIcon, FacebookIcon } from '@/components/features/SocialIcons';
-// TODO: replace these two with dedicated brand SVGs in SocialIcons.tsx
-// (same shape as LinkedinIcon/InstagramIcon/FacebookIcon) once you have them —
-// AtSign/Building2 from lucide-react are just placeholders for now.
-import { AtSign, Building2 } from 'lucide-react';
+// TODO: replace these with dedicated brand SVGs in SocialIcons.tsx once you have them —
+// AtSign/Building2/MessageSquare from lucide-react are just placeholders for now.
+import { AtSign, Building2, MessageSquare } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 
 const platformMeta: Record<string, { label: string; icon: typeof LinkedinIcon; bg: string }> = {
@@ -23,6 +22,7 @@ const platformMeta: Record<string, { label: string; icon: typeof LinkedinIcon; b
   linkedin: { label: 'LinkedIn', icon: LinkedinIcon, bg: '#0A66C2' },
   threads: { label: 'Threads', icon: AtSign, bg: '#000000' },
   google_business: { label: 'Google Business Profile', icon: Building2, bg: '#4285F4' },
+  google_chat: { label: 'Google Chat', icon: MessageSquare, bg: '#00897B' },
 }
 
 export default function AccountsPage() {
@@ -39,6 +39,12 @@ export default function AccountsPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Google Chat connect form state — no OAuth redirect, just a webhook URL
+  const [showChatForm, setShowChatForm] = useState(false);
+  const [chatLabel, setChatLabel] = useState('');
+  const [chatWebhookUrl, setChatWebhookUrl] = useState('');
+  const [savingChat, setSavingChat] = useState(false);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/login');
@@ -52,8 +58,17 @@ export default function AccountsPage() {
   }, [user, loadAccounts]);
 
   const handleConnect = (
-    platform: 'facebook' | 'instagram' | 'linkedin' | 'threads' | 'google_business'
+    platform: 'facebook' | 'instagram' | 'linkedin' | 'threads' | 'google_business' | 'google_chat'
   ) => {
+    // Google Chat has no OAuth flow — it's just a webhook URL, so open the
+    // inline form instead of redirecting anywhere.
+    if (platform === 'google_chat') {
+      setShowChatForm(true);
+      setError('');
+      setSuccess('');
+      return;
+    }
+
     // Multiple accounts per platform are allowed — the OAuth callback routes
     // already upsert on (user_id, account_id), so a second account for the
     // same platform is saved as its own row instead of overwriting the first.
@@ -81,6 +96,46 @@ export default function AccountsPage() {
       return
     }
   }
+
+  const handleSaveChatWebhook = async () => {
+    if (!user) return;
+    if (!chatWebhookUrl.trim()) {
+      setError('Please paste the Google Chat webhook URL');
+      return;
+    }
+
+    try {
+      setSavingChat(true);
+      setError('');
+      setSuccess('');
+
+      const res = await fetch('/api/accounts/google-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          label: chatLabel,
+          webhookUrl: chatWebhookUrl.trim(),
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save Google Chat space');
+      }
+
+      setSuccess('Google Chat space connected successfully');
+      setChatLabel('');
+      setChatWebhookUrl('');
+      setShowChatForm(false);
+      await loadAccounts(user.id);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to connect Google Chat');
+    } finally {
+      setSavingChat(false);
+    }
+  };
 
   const handleDisconnect = async (accountId: string) => {
     if (!confirm('Are you sure you want to disconnect this account?')) return;
@@ -111,12 +166,13 @@ export default function AccountsPage() {
     return null;
   }
 
-  const platforms: Array<'facebook' | 'instagram' | 'linkedin' | 'threads' | 'google_business'> = [
+  const platforms: Array<'facebook' | 'instagram' | 'linkedin' | 'threads' | 'google_business' | 'google_chat'> = [
     'facebook',
     'instagram',
     'linkedin',
     'threads',
     'google_business',
+    'google_chat',
   ];
   const accountCountByPlatform = accounts.reduce<Record<string, number>>((acc, a) => {
     acc[a.platform] = (acc[a.platform] ?? 0) + 1;
@@ -147,6 +203,62 @@ export default function AccountsPage() {
           {success && (
             <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
               <p className="text-sm text-green-500">{success}</p>
+            </div>
+          )}
+
+          {/* Google Chat connect form — inline, opens when the card is clicked */}
+          {showChatForm && (
+            <div className="mb-8 bg-card border border-border rounded-lg p-6">
+              <h3 className="font-semibold text-foreground mb-1">Connect a Google Chat Space</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                In your Google Chat space: Space name → Apps and integrations → Add webhooks.
+                Paste the generated webhook URL below.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Label (e.g. "Anthem Small Projects")
+                  </label>
+                  <input
+                    type="text"
+                    value={chatLabel}
+                    onChange={(e) => setChatLabel(e.target.value)}
+                    placeholder="Space label"
+                    className="w-full text-sm px-3.5 py-2.5 border border-border bg-background rounded-lg outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Webhook URL
+                  </label>
+                  <input
+                    type="text"
+                    value={chatWebhookUrl}
+                    onChange={(e) => setChatWebhookUrl(e.target.value)}
+                    placeholder="https://chat.googleapis.com/v1/spaces/..."
+                    className="w-full text-sm px-3.5 py-2.5 border border-border bg-background rounded-lg outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="flex gap-3 pt-1">
+                  <Button
+                    onClick={handleSaveChatWebhook}
+                    disabled={savingChat}
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  >
+                    {savingChat ? 'Saving...' : 'Save Space'}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowChatForm(false);
+                      setChatLabel('');
+                      setChatWebhookUrl('');
+                    }}
+                    variant="ghost"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 
