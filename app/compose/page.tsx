@@ -349,8 +349,8 @@ export default function ComposePage() {
           <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_1fr_0.85fr] gap-6 items-start">
             {/* ===== Compose ===== */}
             <div className="space-y-6">
-              <div className="bg-card border border-border rounded-lg shadow-sm">
-                <div className="px-5 sm:px-6 pt-5 pb-1 flex items-center justify-between border-b border-border">
+              {/* <div className="bg-card border border-border rounded-lg shadow-sm"> */}
+                {/* <div className="px-5 sm:px-6 pt-5 pb-1 flex items-center justify-between border-b border-border">
                   <div className="flex items-center gap-2 pb-3">
                     <FileText className="w-4 h-4 text-primary/70" />
                     <span className="text-sm font-medium text-foreground">Post content</span>
@@ -368,9 +368,9 @@ export default function ComposePage() {
                     <StickyNote className="w-3 h-3" />
                     Notes{internalNotes ? ' •' : ''}
                   </button>
-                </div>
+                </div> */}
 
-                <div className="px-5 sm:px-6 pb-6 pt-4 space-y-4">
+                {/* <div className="px-5 sm:px-6 pb-6 pt-6 space-y-4"> */}
                   {showNotes && (
                     <textarea
                       value={internalNotes}
@@ -405,8 +405,8 @@ export default function ComposePage() {
                       {selectedPlatforms.length > 1 && ` — lowest across your selected platforms`}
                     </p>
                   )}
-                </div>
-              </div>
+                {/* </div> */}
+              {/* </div> */}
 
               {/* Actions */}
               <div className="flex gap-3">

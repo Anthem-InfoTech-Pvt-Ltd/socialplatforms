@@ -1,21 +1,26 @@
 // app/api/auth/threads/route.ts
-//
-// Threads uses its own app credentials (Threads App ID / Threads App Secret
-// from the Meta dev console — "Threads" use case on the same app you already
-// created for Facebook/Instagram, but NOT the same as FACEBOOK_APP_ID/SECRET).
-// Scopes must be comma-separated, not space/plus-joined — Threads rejects the
-// "+"-joined form that most OAuth libs produce by default.
+
 export async function GET() {
+  const appId = process.env.THREADS_APP_ID
+  const nextAuthUrl = process.env.NEXTAUTH_URL
+
+  if (!appId || !nextAuthUrl) {
+    return new Response('Missing Threads OAuth configuration', {
+      status: 500,
+    })
+  }
+
   const params = new URLSearchParams({
-    client_id: process.env.THREADS_APP_ID!,
-    redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/threads/callback`,
+    client_id: appId,
+    redirect_uri: `${nextAuthUrl}/api/auth/threads/callback`,
     scope: 'threads_basic,threads_content_publish',
     response_type: 'code',
   })
 
-  console.log('THREADS AUTHORIZE URL:', `https://threads.net/oauth/authorize?${params}`)
+  const authorizeUrl = `https://threads.net/oauth/authorize?${params.toString()}`
 
-  return Response.redirect(
-    `https://threads.net/oauth/authorize?${params}`
-  )
+  console.log('THREADS AUTHORIZE URL:', authorizeUrl)
+  console.log('THREADS_APP_ID:', appId)
+
+  return Response.redirect(authorizeUrl)
 }
