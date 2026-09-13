@@ -4,6 +4,14 @@ import { createContext, useContext, useState, useCallback, ReactNode } from 'rea
 import { Post } from '@/types';
 import { postService } from '@/services/postService';
 
+// Per-platform override saved from the compose page's "Customize for
+// <platform>" editor. Only platforms the user actually customized carry a
+// key here — everything else keeps publishing the common post.
+export type PlatformOverrides = Record<
+  string,
+  { html: string; text: string; mediaUrls: string[] }
+>;
+
 interface PostsContextType {
   posts: Post[];
   isLoading: boolean;
@@ -15,7 +23,8 @@ interface PostsContextType {
     platforms: string[],
     mediaUrls?: string[],
     location?: string,
-    internalNotes?: string
+    internalNotes?: string,
+    platformOverrides?: PlatformOverrides
   ) => Promise<Post>;
   updatePost: (postId: string, updates: Partial<Post>) => Promise<Post>;
   deletePost: (postId: string) => Promise<void>;
@@ -50,7 +59,8 @@ export function PostsProvider({ children }: { children: ReactNode }) {
       platforms: string[],
       mediaUrls: string[] = [],
       location?: string,
-      internalNotes?: string
+      internalNotes?: string,
+      platformOverrides?: PlatformOverrides
     ) => {
       try {
         const newPost = await postService.createPost(
@@ -59,7 +69,8 @@ export function PostsProvider({ children }: { children: ReactNode }) {
           platforms,
           mediaUrls,
           location,
-          internalNotes
+          internalNotes,
+          platformOverrides
         );
         setPosts((prev) => [newPost, ...prev]);
         return newPost;

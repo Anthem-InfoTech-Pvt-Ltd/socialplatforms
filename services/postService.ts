@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import { Post, PostEngagement } from '@/types'
+import type { PlatformOverrides } from '@/store/PostsContext'
 
 // OPTIONAL MIGRATION — only needed if you want `location` / `internalNotes` to
 // actually persist in Supabase. Without running this, createPost() still works
@@ -7,6 +8,10 @@ import { Post, PostEngagement } from '@/types'
 //
 //   alter table posts add column if not exists location text;
 //   alter table posts add column if not exists internal_notes text;
+//
+// `platform_overrides` is already added (jsonb default '{}'), so no extra
+// migration is needed for it — the same missing-column fallback below still
+// covers it in case it's ever missing on a fresh environment.
 
 const supabase = createClient()
 
@@ -20,6 +25,9 @@ function mapPost(row: any): Post {
     status: row.status,
     location: row.location ?? undefined,
     internalNotes: row.internal_notes ?? undefined,
+    // Per-platform custom versions — falls back to {} so callers can always
+    // safely do `post.platformOverrides[platform]` without a null check.
+    platformOverrides: row.platform_overrides ?? {},
     scheduledAt: row.scheduled_at ? new Date(row.scheduled_at) : undefined,
     publishedAt: row.published_at ? new Date(row.published_at) : undefined,
     createdAt: new Date(row.created_at),
@@ -78,7 +86,8 @@ export const postService = {
     platforms: string[],
     mediaUrls: string[] = [],
     location?: string,
-    internalNotes?: string
+    internalNotes?: string,
+    platformOverrides?: PlatformOverrides
   ) {
     const basePayload = {
       user_id: userId,
@@ -88,10 +97,14 @@ export const postService = {
       status: 'draft',
     }
 
+    // platform_overrides always gets written (defaulting to {}) rather than
+    // being conditionally spread like location/internalNotes, since the
+    // column has a DB-level default and every post should have a value here.
     const extendedPayload = {
       ...basePayload,
       ...(location ? { location } : {}),
       ...(internalNotes ? { internal_notes: internalNotes } : {}),
+      platform_overrides: platformOverrides ?? {},
     }
 
     let { data, error } = await supabase
@@ -100,12 +113,13 @@ export const postService = {
       .select()
       .single()
 
-    // Graceful degrade: if location/internal_notes columns don't exist yet,
-    // retry with the original payload so post creation still succeeds.
+    // Graceful degrade: if location/internal_notes/platform_overrides
+    // columns don't exist yet, retry with the original payload so post
+    // creation still succeeds (the override just won't persist).
     if (error && isMissingColumnError(error)) {
       console.warn(
-        'posts.location / posts.internal_notes column missing — saving without them. ' +
-        'Run the migration in the comment at the top of postService.ts to enable them.'
+        'posts.location / posts.internal_notes / posts.platform_overrides column missing — ' +
+        'saving without them. Run the migration in the comment at the top of postService.ts to enable them.'
       )
       ;({ data, error } = await supabase
         .from('posts')
@@ -130,9 +144,17 @@ export const postService = {
   },
 
   async updatePost(postId: string, updates: any) {
+    // If a caller passes `platformOverrides` (camelCase, matching the Post
+    // type) instead of the raw column name, translate it here so editing a
+    // draft's custom versions works the same way createPost does.
+    const { platformOverrides, ...rest } = updates ?? {}
+    const payload = platformOverrides !== undefined
+      ? { ...rest, platform_overrides: platformOverrides }
+      : rest
+
     const { data, error } = await supabase
       .from('posts')
-      .update(updates)
+      .update(payload)
       .eq('id', postId)
       .select()
       .single()

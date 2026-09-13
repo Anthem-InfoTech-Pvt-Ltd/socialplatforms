@@ -91,6 +91,48 @@ async function getFreshGoogleAccessToken(supabase: any, account: any): Promise<s
   return refreshData.access_token
 }
 
+// Shape stored per-platform in posts.platform_overrides. Only platforms the
+// user actually customized in the compose UI show up here — anything absent
+// falls back to the common post.
+interface PlatformOverride {
+  html?: string
+  text?: string
+  mediaUrls?: string[]
+}
+
+// Resolves the content + images a specific account's platform should
+// publish: its own override when one exists, otherwise the common post.
+// Doing this per-account (not once up front) is what lets one platform run
+// a completely different caption/image from the rest without touching them.
+function resolveContentForPlatform(
+  platform: string,
+  commonContentHtml: string,
+  commonPlainText: string,
+  commonImageUrls: string[],
+  location: string | null | undefined,
+  overrides: Record<string, PlatformOverride> | null | undefined
+): { plainText: string; imageUrls: string[] } {
+  const override = overrides?.[platform]
+
+  if (!override) {
+    return { plainText: commonPlainText, imageUrls: commonImageUrls }
+  }
+
+  let plainText = override.text?.trim()
+    ? override.text
+    : htmlToPlainText(override.html ?? commonContentHtml)
+
+  if (location) {
+    plainText = `${plainText}\n\n📍 ${location}`
+  }
+
+  const imageUrls = override.mediaUrls && override.mediaUrls.length > 0
+    ? override.mediaUrls
+    : commonImageUrls
+
+  return { plainText, imageUrls }
+}
+
 export async function POST(request: Request) {
   const { postId, accountIds } = await request.json()
 
@@ -110,29 +152,33 @@ export async function POST(request: Request) {
     )
   }
 
-  let plainText = htmlToPlainText(post.content)
+  let commonPlainText = htmlToPlainText(post.content)
 
   // Optional location tag (posts.location) — only appended if the column
   // exists and has a value, so posts without it behave exactly as before.
   if (post.location) {
-    plainText = `${plainText}\n\n📍 ${post.location}`
+    commonPlainText = `${commonPlainText}\n\n📍 ${post.location}`
   }
 
   // Images upload karke alag se 'media_urls' column mein store hote hain (compose page
   // ke upload button se), HTML content ke andar <img> tag ke roop mein nahi aate.
   // Isliye pehle wahi column check karo; agar kisi purane post mein content ke andar
   // hi <img> tag ho (paste kiya hua), toh fallback ke roop mein wahan se bhi nikaal lo.
-  //
-  // NOTE: agar tumhare Supabase schema mein column ka naam 'media_urls' nahi hai
-  // (jaise 'image_urls' ya 'media'), toh yahan wahi naam use karo.
   const storedMediaUrls: string[] = Array.isArray(post.media_urls) ? post.media_urls : []
-  const imageUrls = storedMediaUrls.length > 0
+  const commonImageUrls = storedMediaUrls.length > 0
     ? storedMediaUrls
     : extractImageUrls(post.content)
 
-  console.log('Plain Text:', plainText)
-  console.log('Plain Text length:', plainText.length)
-  console.log('Images:', imageUrls)
+  // Per-platform overrides saved from the compose UI's "Customize for
+  // <platform>" editor. Keyed by platform id (facebook, instagram, ...),
+  // not account id — every connected account of that platform shares it.
+  const platformOverrides: Record<string, PlatformOverride> =
+    post.platform_overrides && typeof post.platform_overrides === 'object'
+      ? post.platform_overrides
+      : {}
+
+  console.log('Common plain text length:', commonPlainText.length)
+  console.log('Platforms with overrides:', Object.keys(platformOverrides))
 
   const results = []
 
@@ -152,6 +198,20 @@ export async function POST(request: Request) {
       })
       continue
     }
+
+    // Resolve this account's content once, up front — everything below
+    // (facebook/instagram/threads/etc.) uses these instead of the shared
+    // commonPlainText/commonImageUrls that used to be computed once above.
+    const { plainText, imageUrls } = resolveContentForPlatform(
+      account.platform,
+      post.content,
+      commonPlainText,
+      commonImageUrls,
+      post.location,
+      platformOverrides
+    )
+
+    console.log(`[${account.platform}] using ${platformOverrides[account.platform] ? 'CUSTOM' : 'common'} content, length:`, plainText.length)
 
     try {
       let platformPostId: string | null = null
