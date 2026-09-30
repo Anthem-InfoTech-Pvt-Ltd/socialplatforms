@@ -17,10 +17,9 @@ export async function GET() {
     response_type: 'code',
   })
 
-  const authorizeUrl = `https://threads.net/oauth/authorize?${params.toString()}`
+  console.log('THREADS AUTHORIZE URL:', `https://threads.net/oauth/authorize?${params}`)
 
-  console.log('THREADS AUTHORIZE URL:', authorizeUrl)
-  console.log('THREADS_APP_ID:', appId)
-
-  return Response.redirect(authorizeUrl)
+  return Response.redirect(
+    `https://threads.net/oauth/authorize?${params}`
+  )
 }
